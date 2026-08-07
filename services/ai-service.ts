@@ -46,9 +46,20 @@ export class AIService {
     return key;
   }
 
+  private getExtraHeaders(provider: ModelProvider): Record<string, string> {
+    if (provider === "openrouter" || provider === "agentrouter") {
+      return {
+        "HTTP-Referer": "https://hemix.ai",
+        "X-Title": "Hemix AI",
+      };
+    }
+    return {};
+  }
+
   async *streamChat(request: ChatRequest, model: AIModel): AsyncGenerator<string, void, unknown> {
     const config = this.getProviderConfig(model.provider);
     const apiKey = this.getApiKey(model.provider, request.apiKey);
+    const extraHeaders = this.getExtraHeaders(model.provider);
 
     let response: Response;
     let retries = 0;
@@ -61,10 +72,7 @@ export class AIService {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${apiKey}`,
-            ...(model.provider === "openrouter" && {
-              "HTTP-Referer": "https://hemix.ai",
-              "X-Title": "Hemix AI",
-            }),
+            ...extraHeaders,
           },
           body: JSON.stringify({
             model: request.model,
@@ -126,6 +134,7 @@ export class AIService {
   async chat(request: ChatRequest, model: AIModel): Promise<ChatResponse> {
     const config = this.getProviderConfig(model.provider);
     const apiKey = this.getApiKey(model.provider, request.apiKey);
+    const extraHeaders = this.getExtraHeaders(model.provider);
 
     let response: Response;
     let retries = 0;
@@ -138,10 +147,7 @@ export class AIService {
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${apiKey}`,
-            ...(model.provider === "openrouter" && {
-              "HTTP-Referer": "https://hemix.ai",
-              "X-Title": "Hemix AI",
-            }),
+            ...extraHeaders,
           },
           body: JSON.stringify({
             model: request.model,

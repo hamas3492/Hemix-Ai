@@ -66,7 +66,7 @@ function ChatPage() {
 
     let convId = activeConversationId;
     if (!activeConv) {
-      convId = createConversation("gpt-4o-mini");
+      convId = createConversation("gpt-5.0");
     }
 
     const userMessage: Message = {
@@ -86,7 +86,7 @@ function ChatPage() {
     setInput("");
     setAttachments([]);
 
-    const model = getModelById(activeConv?.model || "gpt-4o-mini");
+    const model = getModelById(activeConv?.model || "gpt-5.0");
     if (!model) return;
 
     const assistantMessage: Message = {
@@ -228,7 +228,7 @@ function ChatPage() {
           <Button
             variant="primary"
             size="lg"
-            onClick={() => createConversation("gpt-4o-mini")}
+            onClick={() => createConversation("gpt-5.0")}
           >
             <Sparkles className="w-4 h-4" />
             Start New Chat
@@ -244,7 +244,7 @@ function ChatPage() {
               <button
                 key={i}
                 onClick={() => {
-                  createConversation("gpt-4o-mini");
+                  createConversation("gpt-5.0");
                   setTimeout(() => setInput(s.desc), 200);
                 }}
                 className="glass-card p-4 text-left hover:scale-[1.02] transition-transform"
