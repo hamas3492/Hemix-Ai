@@ -220,8 +220,8 @@ function ChatPage() {
     return (
       <div className="flex-1 flex items-center justify-center h-full">
         <div className="text-center max-w-md px-4">
-          <div className="w-16 h-16 rounded-2xl gradient-bg flex items-center justify-center mx-auto mb-6 animate-pulse-glow">
-            <Sparkles className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 rounded-2xl overflow-hidden mx-auto mb-6 animate-pulse-glow">
+            <img src="/assets/icon.png" alt="Hemix AI" className="w-full h-full object-cover" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Welcome to Hemix AI</h2>
           <p className="text-muted mb-6">Start a conversation with any AI model. Ask anything, upload files, and get instant streaming responses.</p>

@@ -47,8 +47,8 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast }: 
       {isUser ? (
         <Avatar name="You" size="sm" className="mt-1" />
       ) : (
-        <div className="w-8 h-8 rounded-full gradient-bg flex items-center justify-center text-white text-xs font-bold mt-1 shrink-0">
-          H
+        <div className="w-8 h-8 rounded-full overflow-hidden mt-1 shrink-0">
+          <img src="/assets/icon.png" alt="Hemix AI" className="w-full h-full object-cover" />
         </div>
       )}
 

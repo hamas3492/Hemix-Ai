@@ -5,7 +5,6 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Sparkles,
   Plus,
   Search,
   MessageSquare,
@@ -92,8 +91,8 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex items-center justify-between p-4">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl gradient-bg flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0">
+            <img src="/assets/icon.png" alt="Hemix AI" className="w-full h-full object-cover" />
           </div>
           {!collapsed && <span className="text-lg font-bold text-white">Hemix AI</span>}
         </Link>

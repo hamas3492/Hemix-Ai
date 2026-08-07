@@ -20,6 +20,26 @@ export interface ChatResponse {
   };
 }
 
+/**
+ * Internal error carrying full diagnostic detail for server-side logs only.
+ * Never expose `.detail` to end users — use `.userMessage` for anything
+ * rendered in the UI.
+ */
+export class AIServiceError extends Error {
+  public readonly userMessage: string;
+  public readonly detail: string;
+
+  constructor(userMessage: string, detail: string) {
+    super(detail);
+    this.name = "AIServiceError";
+    this.userMessage = userMessage;
+    this.detail = detail;
+  }
+}
+
+const GENERIC_UNAVAILABLE_MESSAGE =
+  "Hemix AI is temporarily unable to reach this model's provider. Please try again in a moment or switch to a different model.";
+
 export class AIService {
   private getProviderConfig(provider: ModelProvider): { baseUrl: string; envKey: string } {
     const configs: Record<ModelProvider, { baseUrl: string; envKey: string }> = {
@@ -41,7 +61,11 @@ export class AIService {
     const config = this.getProviderConfig(provider);
     const key = process.env[config.envKey];
     if (!key) {
-      throw new Error(`API key not configured for provider: ${provider}. Set ${config.envKey} in your environment variables.`);
+      // Detailed diagnostic (env var name, provider) is for server logs ONLY.
+      throw new AIServiceError(
+        GENERIC_UNAVAILABLE_MESSAGE,
+        `API key not configured for provider: ${provider}. Set ${config.envKey} in your environment variables.`
+      );
     }
     return key;
   }
@@ -86,7 +110,8 @@ export class AIService {
 
         if (!response.ok) {
           const errorBody = await response.text();
-          throw new Error(`API error ${response.status}: ${errorBody}`);
+          // Raw provider error body may contain sensitive details — keep server-side only.
+          throw new AIServiceError(GENERIC_UNAVAILABLE_MESSAGE, `API error ${response.status}: ${errorBody}`);
         }
 
         break;
@@ -100,7 +125,7 @@ export class AIService {
     }
 
     const reader = response!.body?.getReader();
-    if (!reader) throw new Error("No response body");
+    if (!reader) throw new AIServiceError(GENERIC_UNAVAILABLE_MESSAGE, "No response body from provider");
 
     const decoder = new TextDecoder();
     let buffer = "";
@@ -161,7 +186,7 @@ export class AIService {
 
         if (!response.ok) {
           const errorBody = await response.text();
-          throw new Error(`API error ${response.status}: ${errorBody}`);
+          throw new AIServiceError(GENERIC_UNAVAILABLE_MESSAGE, `API error ${response.status}: ${errorBody}`);
         }
 
         break;

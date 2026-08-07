@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { aiService } from "@/services/ai-service";
+import { aiService, AIServiceError } from "@/services/ai-service";
 import { getModelById } from "@/lib/models";
 
 export const runtime = "edge";
+
+const FALLBACK_USER_MESSAGE =
+  "Something went wrong while generating a response. Please try again in a moment.";
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,10 +57,15 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (error) {
+          // Full diagnostic detail (provider, status, raw body, env var names)
+          // stays in server logs only — never sent to the client.
+          console.error("[api/chat] streamChat failed:", error);
+
+          const userMessage =
+            error instanceof AIServiceError ? error.userMessage : FALLBACK_USER_MESSAGE;
+
           const errData = JSON.stringify({
-            choices: [{
-              delta: { content: `\n\n[Error: ${error instanceof Error ? error.message : "Unknown error"}]` }
-            }],
+            choices: [{ delta: { content: `\n\n${userMessage}` } }],
           });
           controller.enqueue(encoder.encode(`data: ${errData}\n\n`));
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
@@ -74,8 +82,9 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
+    console.error("[api/chat] request handling failed:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
+      { error: "Invalid request. Please check your input and try again." },
       { status: 500 }
     );
   }
