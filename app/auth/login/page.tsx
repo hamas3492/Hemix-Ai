@@ -97,7 +97,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-sm text-muted">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <a href="/auth/signup" className="text-primary hover:text-primary-400 font-medium transition-colors">
             Sign up
           </a>

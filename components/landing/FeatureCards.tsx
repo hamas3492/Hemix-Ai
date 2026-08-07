@@ -27,7 +27,7 @@ export function FeatureCards() {
           <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4">
             Everything you need.
             <br />
-            <span className="gradient-text">Nothing you don't.</span>
+            <span className="gradient-text">Nothing you don&apos;t.</span>
           </h2>
           <p className="text-muted text-lg max-w-2xl mx-auto">
             Built from the ground up for speed, privacy, and pure productivity.
