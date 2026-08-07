@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import type { Message } from "@/types";
-import { useCopyToClipboard, formatTime } from "@/lib/utils";
+import { copyToClipboard, formatTime } from "@/lib/utils";
 import { Avatar } from "@/components/ui/Avatar";
 import { TypingIndicator } from "@/components/ui/Spinner";
 import { useState } from "react";
@@ -21,10 +21,16 @@ interface ChatBubbleProps {
 }
 
 export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast }: ChatBubbleProps) {
-  const [copied, copy] = useCopyToClipboard();
+  const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const isUser = message.role === "user";
+
+  const handleCopy = (text: string) => {
+    copyToClipboard(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleSaveEdit = () => {
     onEdit?.(editContent);
@@ -103,7 +109,7 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast }: 
                           <div className="flex items-center justify-between px-4 py-2 bg-white/5 rounded-t-lg border-b border-white/5">
                             <span className="text-xs text-muted">{match[1]}</span>
                             <button
-                              onClick={() => copy(code)}
+                              onClick={() => handleCopy(code)}
                               className="text-xs text-muted hover:text-white flex items-center gap-1 transition-colors"
                             >
                               {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -144,7 +150,7 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast }: 
         {!editing && message.status !== "streaming" && (
           <div className={`flex items-center gap-1 ${isUser ? "justify-end" : "justify-start"}`}>
             <button
-              onClick={() => copy(message.content)}
+              onClick={() => handleCopy(message.content)}
               className="p-1.5 text-muted hover:text-white rounded-lg hover:bg-white/5 transition-colors"
               title="Copy"
             >
