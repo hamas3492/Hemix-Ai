@@ -8,8 +8,8 @@ export const PRICING_PLANS: PricingPlan[] = [
     period: "forever",
     description: "Perfect for trying things out and light usage.",
     features: [
-      "50 messages / day",
-      "Access to GPT-4o Mini",
+      "10 messages / day",
+      "Access to AgentRouter Auto",
       "Basic code generation",
       "5 saved conversations",
       "Community support",
@@ -26,7 +26,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     features: [
       "Unlimited messages",
       "Access to all AI models",
-      "Advanced code generation",
+      "GPT-5.0, Claude 5, Claude 4.8",
       "File & image uploads",
       "Priority response speed",
       "API access",
@@ -58,15 +58,15 @@ export const PRICING_PLANS: PricingPlan[] = [
 export const FAQS: FAQItem[] = [
   {
     question: "What is Hemix AI?",
-    answer: "Hemix AI is a premium AI chatbot platform that brings together the world's best language models — GPT, Claude, Gemini, DeepSeek, and more — into one beautiful, unified interface.",
+    answer: "Hemix AI is a premium AI chatbot platform that brings together the world's best language models — GPT-5.0, Claude 5, Claude 4.8, and more — into one beautiful, unified interface.",
   },
   {
     question: "Which AI models are supported?",
-    answer: "We support GPT-4o, Claude 3.5, Gemini 1.5 Pro, DeepSeek V3, Qwen, Llama 3.1, Mistral, and OpenRouter models. You can switch between models seamlessly within any conversation.",
+    answer: "We currently support GPT-5.0, Claude 5 Sonnet, Claude 4.8, and AgentRouter Auto. You can switch between models seamlessly within any conversation.",
   },
   {
     question: "Can I use my own API keys?",
-    answer: "Yes. On the Pro plan and above, you can connect your own API keys for OpenAI, Anthropic, Google, and other providers. Your keys are encrypted and never exposed.",
+    answer: "Yes. On the Pro plan and above, you can connect your own API keys. Your keys are encrypted and never exposed.",
   },
   {
     question: "Is my data private and secure?",
@@ -91,7 +91,7 @@ export const FEATURES: Feature[] = [
   {
     icon: "Brain",
     title: "Multi-Model",
-    description: "Switch between GPT, Claude, Gemini, and more — all in one conversation.",
+    description: "Switch between GPT-5.0, Claude 5, Claude 4.8, and more — all in one conversation.",
   },
   {
     icon: "Code2",

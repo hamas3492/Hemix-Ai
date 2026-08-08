@@ -5,7 +5,7 @@
 
   ### Think Faster. Create Smarter.
 
-  **A premium AI chatbot SaaS platform** — multi-model support for GPT-5.0, Claude 5, Claude 4.8, Gemini, DeepSeek, Qwen, Llama, Mistral, OpenRouter, and AgentRouter.
+  **A premium AI chatbot SaaS platform** — powered by GPT-5.0, Claude 5, Claude 4.8, and AgentRouter Auto.
 
   [![Live Demo](https://img.shields.io/badge/Live-hemix--ai.vercel.app-8B5CF6?style=for-the-badge)](https://hemix-ai.vercel.app)
   [![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
@@ -19,7 +19,7 @@
 ## Features
 
 - 🎨 **Premium UI** — Glassmorphism design with animated aurora background
-- 🤖 **Multi-Model** — Switch between GPT-5.0, Claude 5, Claude 4.8, Gemini, DeepSeek, Qwen, Llama, Mistral, and more in real-time
+- 🤖 **Multi-Model** — Switch between GPT-5.0, Claude 5 Sonnet, Claude 4.8, and AgentRouter Auto in real-time
 - ⚡ **Streaming** — Real-time streaming responses with syntax highlighting
 - 📝 **Markdown** — Full markdown rendering with code blocks and copy support
 - 📎 **File Upload** — Upload images and files to any conversation
@@ -88,27 +88,16 @@ hemix-ai/
 
 | Model | Provider | Context |
 |-------|----------|---------|
-| **GPT-5.0** | AgentRouter | 256K |
-| **Claude 5 Sonnet** | AgentRouter | 200K |
-| **Claude 4.8** | AgentRouter | 200K |
+| GPT-5.0 | AgentRouter | 256K |
+| Claude 5 Sonnet | AgentRouter | 200K |
+| Claude 4.8 | AgentRouter | 200K |
 | AgentRouter Auto | AgentRouter | 256K |
-| GPT-4o | OpenAI | 128K |
-| GPT-4o Mini | OpenAI | 128K |
-| Claude 3.5 Sonnet | Anthropic | 200K |
-| Claude 3 Opus | Anthropic | 200K |
-| Gemini 1.5 Pro | Google | 2M |
-| Gemini 1.5 Flash | Google | 1M |
-| DeepSeek V3 | DeepSeek | 64K |
-| Qwen Max | Alibaba | 32K |
-| Llama 3.1 70B | Meta | 128K |
-| Mistral Large | Mistral | 32K |
-| OpenRouter Auto | OpenRouter | 128K |
 
 ## Deployment
 
 Deployed on **Vercel** — [hemix-ai.vercel.app](https://hemix-ai.vercel.app)
 
-Backend powered by **Supabase** for authentication, chat history, and user data. See `lib/supabase-schema.sql` for the full database schema.
+Backend powered by **Supabase** for authentication, chat history, and user data.
 
 ## License
 

@@ -40,20 +40,17 @@ export class AIServiceError extends Error {
 const GENERIC_UNAVAILABLE_MESSAGE =
   "Hemix AI is temporarily unable to reach this model's provider. Please try again in a moment or switch to a different model.";
 
+const PROVIDER_CONFIGS: Partial<Record<ModelProvider, { baseUrl: string; envKey: string }>> = {
+  agentrouter: { baseUrl: "https://api.agentrouter.com/v1", envKey: "AGENTROUTER_API_KEY" },
+};
+
 export class AIService {
   private getProviderConfig(provider: ModelProvider): { baseUrl: string; envKey: string } {
-    const configs: Record<ModelProvider, { baseUrl: string; envKey: string }> = {
-      openai: { baseUrl: "https://api.openai.com/v1", envKey: "OPENAI_API_KEY" },
-      anthropic: { baseUrl: "https://api.anthropic.com/v1", envKey: "ANTHROPIC_API_KEY" },
-      google: { baseUrl: "https://generativelanguage.googleapis.com/v1", envKey: "GOOGLE_API_KEY" },
-      deepseek: { baseUrl: "https://api.deepseek.com/v1", envKey: "DEEPSEEK_API_KEY" },
-      qwen: { baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1", envKey: "QWEN_API_KEY" },
-      llama: { baseUrl: "https://api.together.xyz/v1", envKey: "LLAMA_API_KEY" },
-      mistral: { baseUrl: "https://api.mistral.ai/v1", envKey: "MISTRAL_API_KEY" },
-      openrouter: { baseUrl: "https://openrouter.ai/api/v1", envKey: "OPENROUTER_API_KEY" },
-      agentrouter: { baseUrl: "https://api.agentrouter.com/v1", envKey: "AGENTROUTER_API_KEY" },
-    };
-    return configs[provider];
+    const config = PROVIDER_CONFIGS[provider];
+    if (!config) {
+      throw new AIServiceError(GENERIC_UNAVAILABLE_MESSAGE, `Unsupported provider: ${provider}`);
+    }
+    return config;
   }
 
   private getApiKey(provider: ModelProvider, customKey?: string): string {
@@ -61,7 +58,6 @@ export class AIService {
     const config = this.getProviderConfig(provider);
     const key = process.env[config.envKey];
     if (!key) {
-      // Detailed diagnostic (env var name, provider) is for server logs ONLY.
       throw new AIServiceError(
         GENERIC_UNAVAILABLE_MESSAGE,
         `API key not configured for provider: ${provider}. Set ${config.envKey} in your environment variables.`
@@ -71,7 +67,7 @@ export class AIService {
   }
 
   private getExtraHeaders(provider: ModelProvider): Record<string, string> {
-    if (provider === "openrouter" || provider === "agentrouter") {
+    if (provider === "agentrouter") {
       return {
         "HTTP-Referer": "https://hemix.ai",
         "X-Title": "Hemix AI",
@@ -110,7 +106,6 @@ export class AIService {
 
         if (!response.ok) {
           const errorBody = await response.text();
-          // Raw provider error body may contain sensitive details — keep server-side only.
           throw new AIServiceError(GENERIC_UNAVAILABLE_MESSAGE, `API error ${response.status}: ${errorBody}`);
         }
 
