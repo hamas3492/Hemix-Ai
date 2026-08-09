@@ -41,7 +41,7 @@ const GENERIC_UNAVAILABLE_MESSAGE =
   "I'm having trouble connecting right now. Please try again in a moment.";
 
 const PROVIDER_CONFIGS: Partial<Record<ModelProvider, { baseUrl: string; envKey: string }>> = {
-  agentrouter: { baseUrl: "https://openrouter.ai/api/v1", envKey: "OPENROUTER_API_KEY" },
+  agentrouter: { baseUrl: "https://agentrouter.org/v1", envKey: "AGENTROUTER_API_KEY" },
 };
 
 export class AIService {

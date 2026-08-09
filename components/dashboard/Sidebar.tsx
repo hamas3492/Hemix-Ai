@@ -1,5 +1,5 @@
 "use client";
-import { DEFAULT_MODEL } from "@/lib/models";
+
 
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -61,7 +61,7 @@ export function Sidebar() {
   const debouncedSearch = useDebounce(searchQuery, 200);
 
   const handleNewChat = () => {
-    createConversation(DEFAULT_MODEL);
+    createConversation("gpt-5");
     setMobileOpen(false);
   };
 
