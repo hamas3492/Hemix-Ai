@@ -16,7 +16,7 @@ export function Hero() {
         className="flex flex-col items-center text-center max-w-4xl mx-auto"
       >
         <Badge variant="primary" className="mb-6 animate-pulse-glow">
-          <Sparkles className="w-3 h-3" />
+          <img src="/assets/icon.png" alt="Hemix AI" className="w-3 h-3 rounded-full object-cover" />
           Powered by 3 Premium Models
         </Badge>
 

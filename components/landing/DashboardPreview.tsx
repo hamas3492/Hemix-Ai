@@ -26,7 +26,7 @@ export function DashboardPreview() {
           <div className="w-48 border-r border-white/5 p-3 hidden sm:block">
             <div className="flex items-center gap-2 px-2 py-2 mb-4">
               <div className="w-7 h-7 rounded-lg gradient-bg flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
+                <img src="/assets/icon.png" alt="Hemix AI" className="w-4 h-4 rounded-full object-cover" />
               </div>
               <span className="text-sm font-semibold text-white">Hemix AI</span>
             </div>

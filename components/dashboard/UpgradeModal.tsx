@@ -67,7 +67,7 @@ export function UpgradeModal({
               )}
             </div>
             <Badge variant="primary" className="bg-primary/20 text-primary-300 border-primary/30 font-semibold px-2.5 py-1">
-              <Sparkles className="w-3 h-3 text-primary animate-pulse" />
+              <img src="/assets/icon.png" alt="Hemix AI" className="w-3 h-3 rounded-full object-cover animate-pulse" />
               PRO TIER
             </Badge>
           </div>

@@ -11,7 +11,7 @@ export function Footer() {
           <div className="col-span-2">
             <div className="flex items-center gap-2.5 mb-4">
               <div className="w-9 h-9 rounded-xl gradient-bg flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
+                <img src="/assets/icon.png" alt="Hemix AI" className="w-5 h-5 rounded-full object-cover" />
               </div>
               <span className="text-lg font-bold text-white">Hemix AI</span>
             </div>

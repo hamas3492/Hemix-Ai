@@ -167,7 +167,7 @@ export function CheckoutModal({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className="w-8 h-8 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary">
-              <Sparkles className="w-4 h-4" />
+              <img src="/assets/icon.png" alt="Hemix AI" className="w-4 h-4 rounded-full object-cover" />
             </span>
             <div>
               <h2 className="text-lg font-bold text-white">

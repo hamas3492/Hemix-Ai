@@ -18,6 +18,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <head>
+        <link rel="icon" href="/assets/icon.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/assets/icon.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>

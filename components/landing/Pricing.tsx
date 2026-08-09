@@ -39,7 +39,7 @@ export function Pricing() {
               {plan.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="gradient-bg text-white text-xs font-semibold px-4 py-1 rounded-full flex items-center gap-1 shadow-lg">
-                    <Sparkles className="w-3 h-3" />
+                    <img src="/assets/icon.png" alt="Hemix AI" className="w-3 h-3 rounded-full object-cover" />
                     Most Popular
                   </span>
                 </div>

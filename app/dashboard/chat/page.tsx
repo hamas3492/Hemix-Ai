@@ -234,7 +234,7 @@ function ChatPage() {
               onClick={() => createConversation("gpt-5")}
               className="bg-gradient-to-r from-primary to-secondary font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-[1.02]"
             >
-              <Sparkles className="w-4 h-4" />
+              <img src="/assets/icon.png" alt="Hemix AI" className="w-4 h-4 rounded-full object-cover" />
               Start New Chat
             </Button>
 

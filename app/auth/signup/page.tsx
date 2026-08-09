@@ -64,7 +64,13 @@ export default function SignupPage() {
 
     setLoading(true);
     try {
-      await signup(name.trim(), email.trim(), password);
+      const result = await signup(name.trim(), email.trim(), password);
+      // If session is returned, email auto-confirmed — skip OTP step
+      if (result?.session) {
+        showSuccess(`Welcome to Hemix AI, ${name.trim()}!`);
+        router.push("/dashboard/chat");
+        return;
+      }
       showSuccess("Verification code sent to your email!");
       setStep(2);
       setResendTimer(60);
@@ -132,7 +138,7 @@ export default function SignupPage() {
         <div className="text-center mb-8">
           <a href="/" className="inline-flex items-center gap-2.5 mb-6">
             <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center shadow-lg shadow-primary/20">
-              <Sparkles className="w-5 h-5 text-white" />
+              <img src="/assets/icon.png" alt="Hemix AI" className="w-5 h-5 rounded-full object-cover" />
             </div>
             <span className="text-xl font-bold text-white">Hemix AI</span>
           </a>
