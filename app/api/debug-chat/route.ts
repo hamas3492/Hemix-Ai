@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge";
+// Use Node.js runtime (AWS Lambda) instead of Edge
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,7 +11,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "AGENTROUTER_API_KEY not set" }, { status: 500 });
     }
 
-    // Try with browser User-Agent
     const response = await fetch("https://agentrouter.org/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -18,8 +18,6 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
         "HTTP-Referer": "https://hemix-ai.vercel.app",
         "X-Title": "Hemix AI",
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "application/json",
       },
       body: JSON.stringify({
         model: "gpt-5",
@@ -36,6 +34,7 @@ export async function POST(req: NextRequest) {
       contentType: response.headers.get("content-type"),
       body: body.substring(0, 500),
       isHTML: body.includes("<!doctype") || body.includes("<html"),
+      runtime: "nodejs",
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
