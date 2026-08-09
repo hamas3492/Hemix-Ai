@@ -1,4 +1,5 @@
 "use client";
+import { DEFAULT_MODEL } from "@/lib/models";
 
 import { useState, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -66,7 +67,7 @@ function ChatPage() {
 
     let convId = activeConversationId;
     if (!activeConv) {
-      convId = createConversation("gpt-5");
+      convId = createConversation(DEFAULT_MODEL);
     }
 
     const userMessage: Message = {
@@ -104,7 +105,7 @@ function ChatPage() {
         headers: { "Content-Type": "application/json" },
         signal: abortRef.current.signal,
         body: JSON.stringify({
-          model: "gpt-5",
+          model: DEFAULT_MODEL,
           messages: [
             { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful, intelligent assistant. Provide clear, accurate, and well-formatted responses." },
             ...(activeConv?.messages || []).map((m) => ({
@@ -231,7 +232,7 @@ function ChatPage() {
             <Button
               variant="primary"
               size="lg"
-              onClick={() => createConversation("gpt-5")}
+              onClick={() => createConversation(DEFAULT_MODEL)}
               className="bg-gradient-to-r from-primary to-secondary font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-[1.02]"
             >
               <img src="/assets/icon.png" alt="Hemix AI" className="w-4 h-4 rounded-full object-cover" />
@@ -248,7 +249,7 @@ function ChatPage() {
                 <button
                   key={i}
                   onClick={() => {
-                    createConversation("gpt-5");
+                    createConversation(DEFAULT_MODEL);
                     setTimeout(() => setInput(s.desc), 200);
                   }}
                   className="glass-card p-3 sm:p-4 text-left hover:scale-[1.02] transition-transform"
