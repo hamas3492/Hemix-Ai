@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "AGENTROUTER_API_KEY not set" }, { status: 500 });
     }
 
+    // Try with browser User-Agent
     const response = await fetch("https://agentrouter.org/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -17,6 +18,8 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
         "HTTP-Referer": "https://hemix-ai.vercel.app",
         "X-Title": "Hemix AI",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json",
       },
       body: JSON.stringify({
         model: "gpt-5",
@@ -30,8 +33,9 @@ export async function POST(req: NextRequest) {
     
     return NextResponse.json({
       status: response.status,
+      contentType: response.headers.get("content-type"),
       body: body.substring(0, 500),
-      keyPrefix: apiKey.substring(0, 8) + "..." + apiKey.substring(apiKey.length - 4),
+      isHTML: body.includes("<!doctype") || body.includes("<html"),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
