@@ -7,17 +7,17 @@ import {
   Send,
   Square,
   Paperclip,
-  Trash2,
   Download,
   Search,
   Sparkles,
   X,
+  Lock,
+  Crown,
+  AlertCircle,
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import type { Message } from "@/types";
 import { useChatStore } from "@/lib/store";
-import { getModelById } from "@/lib/models";
-import { ModelSelector } from "@/components/dashboard/ModelSelector";
 import { ChatBubble } from "@/components/ui/ChatBubble";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
@@ -36,6 +36,7 @@ export default function ChatPageWrapper() {
 function ChatPage() {
   const searchParams = useSearchParams();
   const conversationId = searchParams.get("c");
+
   const {
     conversations,
     activeConversationId,
@@ -47,7 +48,6 @@ function ChatPage() {
     setGenerating,
     chatSettings,
     exportConversation,
-    updateConversationModel,
   } = useChatStore();
 
   const [input, setInput] = useState("");
@@ -66,7 +66,7 @@ function ChatPage() {
 
     let convId = activeConversationId;
     if (!activeConv) {
-      convId = createConversation("gpt-5.0");
+      convId = createConversation("gpt-5");
     }
 
     const userMessage: Message = {
@@ -86,15 +86,11 @@ function ChatPage() {
     setInput("");
     setAttachments([]);
 
-    const model = getModelById(activeConv?.model || "gpt-5.0");
-    if (!model) return;
-
     const assistantMessage: Message = {
       id: nanoid(),
       role: "assistant",
       content: "",
       createdAt: new Date().toISOString(),
-      model: model.name,
       status: "streaming",
     };
 
@@ -108,30 +104,33 @@ function ChatPage() {
         headers: { "Content-Type": "application/json" },
         signal: abortRef.current.signal,
         body: JSON.stringify({
-          model: model.id,
+          model: "gpt-5",
           messages: [
-            { role: "system", content: chatSettings.systemPrompt },
+            { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful, intelligent assistant. Provide clear, accurate, and well-formatted responses." },
             ...(activeConv?.messages || []).map((m) => ({
               role: m.role,
               content: m.content,
             })),
             { role: "user", content: input.trim() },
           ],
-          temperature: chatSettings.temperature,
-          maxTokens: chatSettings.maxTokens,
-          topP: chatSettings.topP,
+          temperature: chatSettings.temperature ?? 0.7,
+          maxTokens: chatSettings.maxTokens ?? 4096,
+          topP: chatSettings.topP ?? 1,
         }),
       });
 
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`Request failed (${response.status})`);
+      }
 
       const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response stream");
       const decoder = new TextDecoder();
       let buffer = "";
       let accumulated = "";
 
       while (true) {
-        const { done, value } = await reader!.read();
+        const { done, value } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
@@ -160,7 +159,7 @@ function ChatPage() {
       }
 
       updateMessage(convId!, assistantMessage.id, {
-        content: accumulated || "No response received.",
+        content: accumulated || "I couldn't generate a response. Please try again.",
         status: "complete",
       });
     } catch (err) {
@@ -168,10 +167,9 @@ function ChatPage() {
         updateMessage(convId!, assistantMessage.id, { status: "complete" });
       } else {
         updateMessage(convId!, assistantMessage.id, {
-          content: `Error: ${err instanceof Error ? err.message : "Something went wrong"}`,
+          content: "I'm having trouble connecting right now. Please try again in a moment.",
           status: "error",
         });
-        showError("Failed to generate response");
       }
     } finally {
       setGenerating(false);
@@ -179,12 +177,13 @@ function ChatPage() {
     }
   }, [
     input,
+    attachments,
     isGenerating,
     activeConv,
     activeConversationId,
+    createConversation,
     addMessage,
     updateMessage,
-    createConversation,
     setGenerating,
     chatSettings,
   ]);
@@ -218,41 +217,47 @@ function ChatPage() {
 
   if (!activeConv) {
     return (
-      <div className="flex-1 flex items-center justify-center h-full">
-        <div className="text-center max-w-md px-4">
-          <div className="w-16 h-16 rounded-2xl overflow-hidden mx-auto mb-6 animate-pulse-glow">
-            <img src="/assets/icon.png" alt="Hemix AI" className="w-full h-full object-cover" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Welcome to Hemix AI</h2>
-          <p className="text-muted mb-6">Start a conversation with any AI model. Ask anything, upload files, and get instant streaming responses.</p>
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={() => createConversation("gpt-5.0")}
-          >
-            <Sparkles className="w-4 h-4" />
-            Start New Chat
-          </Button>
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="text-center max-w-md w-full px-4">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden mx-auto mb-6 border border-primary/30 shadow-xl shadow-primary/20">
+              <img src="/assets/icon.png" alt="Hemix AI" className="w-full h-full object-cover" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Welcome to Hemix AI</h2>
+            <p className="text-muted mb-6 text-sm sm:text-base">
+              Ask anything, upload files, and get instant streaming responses.
+            </p>
 
-          <div className="mt-12 grid grid-cols-2 gap-3 text-left">
-            {[
-              { title: "Write code", desc: "Build a REST API with Express" },
-              { title: "Get creative", desc: "Write a short story about space" },
-              { title: "Analyze data", desc: "Help me understand this CSV" },
-              { title: "Learn something", desc: "Explain quantum computing" },
-            ].map((s, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  createConversation("gpt-5.0");
-                  setTimeout(() => setInput(s.desc), 200);
-                }}
-                className="glass-card p-4 text-left hover:scale-[1.02] transition-transform"
-              >
-                <p className="text-sm font-medium text-white mb-0.5">{s.title}</p>
-                <p className="text-xs text-muted">{s.desc}</p>
-              </button>
-            ))}
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => createConversation("gpt-5")}
+              className="bg-gradient-to-r from-primary to-secondary font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-[1.02]"
+            >
+              <Sparkles className="w-4 h-4" />
+              Start New Chat
+            </Button>
+
+            <div className="mt-8 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+              {[
+                { title: "Write code", desc: "Build a REST API with Express" },
+                { title: "Get creative", desc: "Write a short story about space" },
+                { title: "Analyze data", desc: "Help me understand this CSV" },
+                { title: "Learn something", desc: "Explain quantum computing" },
+              ].map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    createConversation("gpt-5");
+                    setTimeout(() => setInput(s.desc), 200);
+                  }}
+                  className="glass-card p-3 sm:p-4 text-left hover:scale-[1.02] transition-transform"
+                >
+                  <p className="text-sm font-medium text-white mb-0.5">{s.title}</p>
+                  <p className="text-xs text-muted">{s.desc}</p>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -264,23 +269,14 @@ function ChatPage() {
     : activeConv.messages;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-w-0">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <ModelSelector
-            value={activeConv.model}
-            onChange={(modelId) => {
-              useChatStore.getState().renameConversation(activeConv.id, activeConv.title);
-              // Update model by replacing conversation
-              const conv = useChatStore.getState().conversations.find((c) => c.id === activeConv.id);
-              if (conv) useChatStore.getState().updateMessage(activeConv.id, conv.messages[0]?.id || "", {});
-            }}
-          />
-          <span className="text-sm text-muted hidden sm:block">{activeConv.title}</span>
+      <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b border-white/5 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm text-white font-medium truncate">{activeConv.title}</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 shrink-0">
           <Button variant="ghost" size="icon" onClick={() => setShowSearch(!showSearch)} title="Search">
             <Search className="w-4 h-4" />
           </Button>
@@ -297,7 +293,7 @@ function ChatPage() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden px-4 border-b border-white/5"
+            className="overflow-hidden px-3 sm:px-4 border-b border-white/5"
           >
             <div className="relative py-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
@@ -315,8 +311,8 @@ function ChatPage() {
       </AnimatePresence>
 
       {/* Messages */}
-      <div ref={messagesEndRef} className="flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 min-h-0">
+        <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
           {filteredMessages.map((msg, i) => (
             <ChatBubble
               key={msg.id}
@@ -333,15 +329,16 @@ function ChatPage() {
         </div>
       </div>
 
-      {/* Input */}
-      <div className="border-t border-white/5 p-4">
+      {/* Input section */}
+      <div className="border-t border-white/10 bg-[#050505]/90 px-3 sm:px-4 py-3 sm:py-4 backdrop-blur-xl shrink-0">
         <div className="max-w-3xl mx-auto">
+          {/* Attachments list */}
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {attachments.map((file, i) => (
                 <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
                   <Paperclip className="w-3 h-3 text-muted" />
-                  <span className="text-xs text-white truncate max-w-[150px]">{file.name}</span>
+                  <span className="text-xs text-white truncate max-w-[120px] sm:max-w-[150px]">{file.name}</span>
                   <button
                     onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
                     className="text-muted hover:text-white"
@@ -353,8 +350,9 @@ function ChatPage() {
             </div>
           )}
 
+          {/* Textarea & Send button */}
           <div className="flex items-end gap-2">
-            <div className="flex-1 relative">
+            <div className="flex-1 relative min-w-0">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -366,21 +364,21 @@ function ChatPage() {
                 }}
                 placeholder="Ask anything... (Shift+Enter for new line)"
                 rows={1}
-                className="w-full px-4 py-3 pr-12 rounded-2xl bg-white/5 border border-white/10 text-white placeholder:text-muted/50 resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[52px] max-h-[200px]"
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 rounded-2xl bg-white/5 border border-white/10 text-sm text-white placeholder:text-muted/50 resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]"
                 style={{ height: "auto" }}
                 onInput={(e) => {
                   e.currentTarget.style.height = "auto";
                   e.currentTarget.style.height = e.currentTarget.scrollHeight + "px";
                 }}
               />
-              <label className="absolute right-3 bottom-3 cursor-pointer">
+              <label className="absolute right-2 sm:right-3 bottom-2.5 sm:bottom-3 cursor-pointer">
                 <input type="file" multiple className="hidden" onChange={handleFileSelect} />
                 <Paperclip className="w-4 h-4 text-muted hover:text-white transition-colors" />
               </label>
             </div>
 
             {isGenerating ? (
-              <Button variant="destructive" size="icon" onClick={handleStop} className="rounded-2xl">
+              <Button variant="destructive" size="icon" onClick={handleStop} className="rounded-2xl shrink-0">
                 <Square className="w-4 h-4" />
               </Button>
             ) : (
@@ -389,14 +387,14 @@ function ChatPage() {
                 size="icon"
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className="rounded-2xl"
+                className="rounded-2xl bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-md shadow-primary/20 shrink-0"
               >
                 <Send className="w-4 h-4" />
               </Button>
             )}
           </div>
 
-          <p className="text-xs text-muted/60 text-center mt-2">
+          <p className="text-[10px] sm:text-xs text-muted/60 text-center mt-2">
             Hemix AI can make mistakes. Verify important information.
           </p>
         </div>

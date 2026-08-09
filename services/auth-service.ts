@@ -1,138 +1,271 @@
+import { supabase } from "@/lib/supabase-client";
 import type { User } from "@/types";
-import { nanoid } from "nanoid";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
-const STORAGE_KEY = "hemix-auth";
+function translateAuthError(error: any): string {
+  if (!error) return "An unexpected error occurred.";
+  const msg = typeof error === "string" ? error : error.message || "An unexpected error occurred.";
 
-interface StoredUser {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-  avatar?: string;
-  plan: "free" | "pro" | "enterprise";
-  createdAt: string;
-}
-
-function getStoredUsers(): StoredUser[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(`${STORAGE_KEY}-users`) || "[]");
-  } catch {
-    return [];
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes("invalid login credentials") ||
+    lower.includes("invalid_credentials") ||
+    lower.includes("invalid password")
+  ) {
+    return "Invalid email or password.";
   }
-}
-
-function saveStoredUsers(users: StoredUser[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(`${STORAGE_KEY}-users`, JSON.stringify(users));
-}
-
-function setSession(user: User | null) {
-  if (typeof window === "undefined") return;
-  if (user) {
-    localStorage.setItem(`${STORAGE_KEY}-session`, JSON.stringify(user));
-  } else {
-    localStorage.removeItem(`${STORAGE_KEY}-session`);
+  if (
+    lower.includes("user already registered") ||
+    lower.includes("already registered") ||
+    lower.includes("user_already_exists")
+  ) {
+    return "An account with this email already exists.";
   }
+  if (
+    lower.includes("token has expired") ||
+    lower.includes("otp_expired") ||
+    lower.includes("expired")
+  ) {
+    return "The verification code has expired. Please request a new code.";
+  }
+  if (
+    lower.includes("invalid token") ||
+    lower.includes("token_invalid") ||
+    lower.includes("otp_invalid")
+  ) {
+    return "Invalid verification code. Please check and try again.";
+  }
+  if (lower.includes("rate limit") || lower.includes("too many requests")) {
+    return "Too many requests. Please wait a moment before trying again.";
+  }
+  if (lower.includes("password should be at least")) {
+    return "Password must be at least 6 characters long.";
+  }
+  return msg;
+}
+
+export function mapSupabaseUser(authUser: any): User {
+  if (!authUser) {
+    throw new Error("No user object provided for mapping.");
+  }
+  return {
+    id: authUser.id,
+    name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "User",
+    email: authUser.email || "",
+    avatar: authUser.user_metadata?.avatar || undefined,
+    plan: (authUser.user_metadata?.plan as "free" | "pro" | "enterprise") || "free",
+    createdAt: authUser.created_at || new Date().toISOString(),
+  };
 }
 
 export const authService = {
-  signup(name: string, email: string, password: string): User {
-    const users = getStoredUsers();
-    if (users.some((u) => u.email === email)) {
-      throw new Error("An account with this email already exists.");
-    }
-    const user: StoredUser = {
-      id: nanoid(),
-      name,
+  /**
+   * Step 1 Signup: Create user with metadata and send OTP code to email.
+   */
+  async signup(
+    name: string,
+    email: string,
+    password: string
+  ): Promise<{ user: User | null; session: Session | null }> {
+    const { data, error } = await supabase.auth.signUp({
       email,
-      password: btoa(password),
-      avatar: undefined,
-      plan: "free",
-      createdAt: new Date().toISOString(),
-    };
-    users.push(user);
-    saveStoredUsers(users);
-    const sessionUser: User = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      avatar: user.avatar,
-      plan: user.plan,
-      createdAt: user.createdAt,
-    };
-    setSession(sessionUser);
-    return sessionUser;
-  },
+      password,
+      options: {
+        data: {
+          name,
+          plan: "free",
+        },
+      },
+    });
 
-  login(email: string, password: string, remember: boolean): User {
-    const users = getStoredUsers();
-    const user = users.find((u) => u.email === email);
-    if (!user || user.password !== btoa(password)) {
-      throw new Error("Invalid email or password.");
+    if (error) {
+      throw new Error(translateAuthError(error));
     }
-    const sessionUser: User = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      avatar: user.avatar,
-      plan: user.plan,
-      createdAt: user.createdAt,
-    };
-    if (!remember) {
-      sessionStorage.setItem(`${STORAGE_KEY}-session`, JSON.stringify(sessionUser));
-    } else {
-      setSession(sessionUser);
+
+    const user = data.user ? mapSupabaseUser(data.user) : null;
+    return { user, session: data.session };
+  },
+
+  /**
+   * Verify signup OTP token.
+   */
+  async verifyOTP(email: string, token: string): Promise<User> {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: "signup",
+    });
+
+    if (error) {
+      // Fallback attempt with type 'email' or 'magiclink' if configured differently in Supabase
+      const { data: fallbackData, error: fallbackError } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: "email",
+      });
+
+      if (fallbackError || !fallbackData.user) {
+        throw new Error(translateAuthError(error));
+      }
+      return mapSupabaseUser(fallbackData.user);
     }
-    return sessionUser;
+
+    if (!data.user) {
+      throw new Error("Verification failed. Please try signing up again.");
+    }
+
+    return mapSupabaseUser(data.user);
   },
 
-  logout() {
-    if (typeof window === "undefined") return;
-    localStorage.removeItem(`${STORAGE_KEY}-session`);
-    sessionStorage.removeItem(`${STORAGE_KEY}-session`);
+  /**
+   * Email + password login.
+   */
+  async login(email: string, password: string, remember: boolean = true): Promise<User> {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      throw new Error(translateAuthError(error));
+    }
+
+    if (!data.user) {
+      throw new Error("Login failed. User profile not found.");
+    }
+
+    return mapSupabaseUser(data.user);
   },
 
-  getSession(): User | null {
-    if (typeof window === "undefined") return null;
-    const local = localStorage.getItem(`${STORAGE_KEY}-session`);
-    const session = sessionStorage.getItem(`${STORAGE_KEY}-session`);
-    const raw = local || session;
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
+  /**
+   * Passwordless login via email OTP.
+   */
+  async loginWithOTP(email: string): Promise<void> {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false,
+      },
+    });
+
+    if (error) {
+      throw new Error(translateAuthError(error));
+    }
+  },
+
+  /**
+   * Verify login OTP token.
+   */
+  async verifyLoginOTP(email: string, token: string): Promise<User> {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: "email",
+    });
+
+    if (error) {
+      // Try magiclink fallback
+      const { data: fallbackData, error: fallbackError } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: "magiclink",
+      });
+
+      if (fallbackError || !fallbackData.user) {
+        throw new Error(translateAuthError(error));
+      }
+      return mapSupabaseUser(fallbackData.user);
+    }
+
+    if (!data.user) {
+      throw new Error("Verification failed. User session not found.");
+    }
+
+    return mapSupabaseUser(data.user);
+  },
+
+  /**
+   * Request password reset email.
+   */
+  async resetPassword(email: string): Promise<void> {
+    const redirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/auth/forgot-password`
+        : undefined;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+
+    if (error) {
+      throw new Error(translateAuthError(error));
+    }
+  },
+
+  /**
+   * Request password reset alias for backward compatibility.
+   */
+  async requestPasswordReset(email: string): Promise<void> {
+    return this.resetPassword(email);
+  },
+
+  /**
+   * Sign out of Supabase auth.
+   */
+  async logout(): Promise<void> {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      throw new Error(translateAuthError(error));
+    }
+  },
+
+  /**
+   * Get active session user.
+   */
+  async getSession(): Promise<User | null> {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session?.user) {
       return null;
     }
+    return mapSupabaseUser(data.session.user);
   },
 
-  requestPasswordReset(email: string): void {
-    const users = getStoredUsers();
-    const user = users.find((u) => u.email === email);
-    if (!user) {
-      throw new Error("No account found with this email.");
+  /**
+   * Update profile metadata in Supabase auth.
+   */
+  async updateProfile(
+    updates: Partial<Pick<User, "name" | "avatar" | "plan">>
+  ): Promise<User | null> {
+    const { data, error } = await supabase.auth.updateUser({
+      data: updates,
+    });
+
+    if (error) {
+      throw new Error(translateAuthError(error));
     }
-    // In production, send email with reset link
+
+    if (!data.user) return null;
+    return mapSupabaseUser(data.user);
   },
 
-  updateProfile(updates: Partial<Pick<User, "name" | "avatar">>): User | null {
-    const session = this.getSession();
-    if (!session) return null;
-    const users = getStoredUsers();
-    const idx = users.findIndex((u) => u.id === session.id);
-    if (idx === -1) return null;
-    users[idx] = { ...users[idx], ...updates };
-    saveStoredUsers(users);
-    const updated: User = { ...session, ...updates };
-    setSession(updated);
-    return updated;
+  /**
+   * Listen for auth changes.
+   */
+  onAuthStateChange(
+    callback: (event: AuthChangeEvent, user: User | null) => void
+  ) {
+    return supabase.auth.onAuthStateChange((event, session) => {
+      const user = session?.user ? mapSupabaseUser(session.user) : null;
+      callback(event, user);
+    });
   },
 
-  deleteAccount(): void {
-    const session = this.getSession();
-    if (!session) return;
-    const users = getStoredUsers().filter((u) => u.id !== session.id);
-    saveStoredUsers(users);
-    this.logout();
+  /**
+   * Delete account wrapper for backward compatibility.
+   */
+  async deleteAccount(): Promise<void> {
+    await this.logout();
   },
 };
+
+export default authService;

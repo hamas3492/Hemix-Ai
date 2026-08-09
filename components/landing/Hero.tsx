@@ -17,7 +17,7 @@ export function Hero() {
       >
         <Badge variant="primary" className="mb-6 animate-pulse-glow">
           <Sparkles className="w-3 h-3" />
-          Powered by 4 Premium Models
+          Powered by 3 Premium Models
         </Badge>
 
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold text-white leading-tight tracking-tight text-balance">
@@ -27,7 +27,7 @@ export function Hero() {
         </h1>
 
         <p className="mt-6 text-lg text-muted max-w-2xl text-balance">
-          The premium AI platform that brings GPT-5.0, Claude 5, Claude 4.8, and more into one
+          The premium AI platform that brings GPT-5, Claude Sonnet 4.5, and more into one
           beautiful, unified experience. Stream responses, write code, analyze files — all in real-time.
         </p>
 

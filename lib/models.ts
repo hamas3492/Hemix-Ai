@@ -2,48 +2,37 @@ import type { AIModel } from "@/types";
 
 export const AI_MODELS: AIModel[] = [
   {
-    id: "gpt-5.0",
-    name: "GPT-5.0",
+    id: "gpt-5",
+    name: "GPT-5",
     provider: "agentrouter",
     description: "OpenAI's most advanced model — superior reasoning, coding, and multimodal capabilities.",
-    contextWindow: 256000,
+    contextWindow: 128000,
     inputPrice: 10.0,
     outputPrice: 30.0,
     capabilities: ["Vision", "Code", "Reasoning", "Tools", "Multimodal"],
     badge: "Flagship",
   },
   {
-    id: "claude-5-sonnet",
-    name: "Claude 5 Sonnet",
+    id: "claude-sonnet-4-5-20250929",
+    name: "Claude Sonnet 4.5",
     provider: "agentrouter",
-    description: "Anthropic's next-gen model with enhanced reasoning and creative writing.",
-    contextWindow: 200000,
-    inputPrice: 5.0,
-    outputPrice: 25.0,
+    description: "Anthropic's latest model with enhanced reasoning and creative writing.",
+    contextWindow: 1000000,
+    inputPrice: 6.0,
+    outputPrice: 30.0,
     capabilities: ["Code", "Analysis", "Writing", "Vision", "Reasoning"],
     badge: "New",
   },
   {
-    id: "claude-4.8",
-    name: "Claude 4.8",
+    id: "claude-sonnet-4-20250514",
+    name: "Claude Sonnet 4",
     provider: "agentrouter",
-    description: "Claude 4.8 — exceptional at coding, analysis, and long-context tasks.",
+    description: "Exceptional at coding, analysis, and long-context tasks.",
     contextWindow: 200000,
-    inputPrice: 4.0,
-    outputPrice: 20.0,
+    inputPrice: 3.0,
+    outputPrice: 15.0,
     capabilities: ["Code", "Analysis", "Writing", "Vision"],
     badge: "Best for Code",
-  },
-  {
-    id: "agentrouter/auto",
-    name: "AgentRouter Auto",
-    provider: "agentrouter",
-    description: "Automatically routes to the best model for your query.",
-    contextWindow: 256000,
-    inputPrice: 1.0,
-    outputPrice: 1.0,
-    capabilities: ["Auto-routing", "Multi-model", "Smart"],
-    badge: "Smart Routing",
   },
 ];
 
@@ -55,4 +44,4 @@ export function getModelsByProvider(provider: string): AIModel[] {
   return AI_MODELS.filter((m) => m.provider === provider);
 }
 
-export const DEFAULT_MODEL = "gpt-5.0";
+export const DEFAULT_MODEL = "gpt-5";

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 import type { Conversation, Message, ChatSettings, AppSettings, User } from "@/types";
+import type { SubscriptionRecord } from "@/services/payment-service";
 
 interface ChatStore {
   conversations: Conversation[];
@@ -11,6 +12,11 @@ interface ChatStore {
   chatSettings: ChatSettings;
   appSettings: AppSettings;
   user: User | null;
+
+  // Subscription & Usage limits state
+  subscription: SubscriptionRecord | null;
+  dailyMessageCount: number;
+  lastMessageDate: string;
 
   createConversation: (model: string) => string;
   deleteConversation: (id: string) => void;
@@ -27,6 +33,11 @@ interface ChatStore {
   setAppSettings: (settings: Partial<AppSettings>) => void;
   setUser: (user: User | null) => void;
   exportConversation: (id: string) => string;
+
+  // New Subscription & Usage methods
+  incrementMessageCount: () => void;
+  setSubscription: (subscription: SubscriptionRecord | null) => void;
+  resetDailyCount: () => void;
 }
 
 const defaultChatSettings: ChatSettings = {
@@ -58,6 +69,10 @@ export const useChatStore = create<ChatStore>()(
       chatSettings: defaultChatSettings,
       appSettings: defaultAppSettings,
       user: null,
+
+      subscription: null,
+      dailyMessageCount: 0,
+      lastMessageDate: new Date().toISOString().split("T")[0],
 
       createConversation: (model: string) => {
         const id = nanoid();
@@ -179,6 +194,33 @@ export const useChatStore = create<ChatStore>()(
           lines.push("");
         }
         return lines.join("\n");
+      },
+
+      incrementMessageCount: () => {
+        const today = new Date().toISOString().split("T")[0];
+        const { lastMessageDate, dailyMessageCount } = get();
+        if (lastMessageDate !== today) {
+          set({ dailyMessageCount: 1, lastMessageDate: today });
+        } else {
+          set({ dailyMessageCount: dailyMessageCount + 1 });
+        }
+      },
+
+      setSubscription: (subscription: SubscriptionRecord | null) => {
+        set((state) => {
+          if (subscription?.status === "active" && state.user) {
+            return {
+              subscription,
+              user: { ...state.user, plan: subscription.plan },
+            };
+          }
+          return { subscription };
+        });
+      },
+
+      resetDailyCount: () => {
+        const today = new Date().toISOString().split("T")[0];
+        set({ dailyMessageCount: 0, lastMessageDate: today });
       },
     }),
     {

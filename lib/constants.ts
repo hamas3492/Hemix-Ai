@@ -26,7 +26,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     features: [
       "Unlimited messages",
       "Access to all AI models",
-      "GPT-5.0, Claude 5, Claude 4.8",
+      "GPT-5, Claude Sonnet 4.5, Claude Sonnet 4",
       "File & image uploads",
       "Priority response speed",
       "API access",
@@ -58,11 +58,11 @@ export const PRICING_PLANS: PricingPlan[] = [
 export const FAQS: FAQItem[] = [
   {
     question: "What is Hemix AI?",
-    answer: "Hemix AI is a premium AI chatbot platform that brings together the world's best language models — GPT-5.0, Claude 5, Claude 4.8, and more — into one beautiful, unified interface.",
+    answer: "Hemix AI is a premium AI chatbot platform that brings together the world's best language models — GPT-5, Claude Sonnet 4.5, Claude Sonnet 4, and more — into one beautiful, unified interface.",
   },
   {
     question: "Which AI models are supported?",
-    answer: "We currently support GPT-5.0, Claude 5 Sonnet, Claude 4.8, and AgentRouter Auto. You can switch between models seamlessly within any conversation.",
+    answer: "We currently support GPT-5, Claude Sonnet 4.5, and Claude Sonnet 4. All powered by the AgentRouter unified API.",
   },
   {
     question: "Can I use my own API keys?",
@@ -91,7 +91,7 @@ export const FEATURES: Feature[] = [
   {
     icon: "Brain",
     title: "Multi-Model",
-    description: "Switch between GPT-5.0, Claude 5, Claude 4.8, and more — all in one conversation.",
+    description: "Switch between GPT-5, Claude Sonnet 4.5, Claude Sonnet 4, and more — all in one conversation.",
   },
   {
     icon: "Code2",

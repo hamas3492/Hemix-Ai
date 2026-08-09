@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
+export * from "./useSubscription";
+
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(false);
 

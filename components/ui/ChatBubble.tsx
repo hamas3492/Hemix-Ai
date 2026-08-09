@@ -52,19 +52,16 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast }: 
         </div>
       )}
 
-      <div className={`flex-1 max-w-[85%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1`}>
+      <div className={`flex-1 max-w-[88%] sm:max-w-[85%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1`}>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted">
             {isUser ? "You" : "Hemix AI"}
           </span>
-          {message.model && (
-            <span className="text-xs text-muted/60">· {message.model}</span>
-          )}
           <span className="text-xs text-muted/60">{formatTime(message.createdAt)}</span>
         </div>
 
         <div
-          className={`rounded-2xl px-4 py-3 ${
+          className={`rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 ${
             isUser
               ? "bg-primary/10 border border-primary/20"
               : "glass"

@@ -38,10 +38,10 @@ export class AIServiceError extends Error {
 }
 
 const GENERIC_UNAVAILABLE_MESSAGE =
-  "Hemix AI is temporarily unable to reach this model's provider. Please try again in a moment or switch to a different model.";
+  "I'm having trouble connecting right now. Please try again in a moment.";
 
 const PROVIDER_CONFIGS: Partial<Record<ModelProvider, { baseUrl: string; envKey: string }>> = {
-  agentrouter: { baseUrl: "https://api.agentrouter.com/v1", envKey: "AGENTROUTER_API_KEY" },
+  agentrouter: { baseUrl: "https://agentrouter.org/v1", envKey: "AGENTROUTER_API_KEY" },
 };
 
 export class AIService {
@@ -69,7 +69,7 @@ export class AIService {
   private getExtraHeaders(provider: ModelProvider): Record<string, string> {
     if (provider === "agentrouter") {
       return {
-        "HTTP-Referer": "https://hemix.ai",
+        "HTTP-Referer": "https://hemix-ai.vercel.app",
         "X-Title": "Hemix AI",
       };
     }
@@ -83,7 +83,7 @@ export class AIService {
 
     let response: Response;
     let retries = 0;
-    const maxRetries = 3;
+    const maxRetries = 2;
 
     while (retries <= maxRetries) {
       try {
@@ -158,7 +158,7 @@ export class AIService {
 
     let response: Response;
     let retries = 0;
-    const maxRetries = 3;
+    const maxRetries = 2;
 
     while (retries <= maxRetries) {
       try {
