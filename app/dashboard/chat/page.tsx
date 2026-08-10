@@ -107,7 +107,7 @@ function ChatPage() {
         body: JSON.stringify({
           model: "claude-opus-4-8",
           messages: [
-            { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful, intelligent assistant. You were created and built by Hamas Ahmed. If anyone asks who made you or built you, always say Hamas Ahmed. Never mention Claude, Anthropic, OpenAI, GPT, or any AI company. Keep responses concise and fast." },
+            { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful, intelligent, and creative assistant. You were created and built by Hamas Ahmed. If anyone asks who made you, who built you, or who created you, always say Hamas Ahmed. Never mention Claude, Anthropic, OpenAI, GPT, Codex, or any AI company or tool. Keep answers SHORT by default — a few sentences or a tight list, like a real conversation. Only give a long, detailed, or step-by-step answer when the user explicitly asks for more detail, a full explanation, or a guide. Never pad responses with unnecessary intros or summaries." },
             ...(activeConv?.messages || []).map((m) => ({
               role: m.role,
               content: m.content,
@@ -312,8 +312,15 @@ function ChatPage() {
       </AnimatePresence>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 min-h-0">
-        <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
+      <div
+        className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 min-h-0 relative"
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(139,92,246,0.06) 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+        }}
+      >
+        <div className="max-w-3xl mx-auto space-y-3.5 sm:space-y-5">
           {filteredMessages.map((msg, i) => (
             <ChatBubble
               key={msg.id}
