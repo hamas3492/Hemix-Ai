@@ -3,6 +3,7 @@ import { aiService, AIServiceError } from "@/services/ai-service";
 import { getModelById } from "@/lib/models";
 
 export const runtime = "edge";
+export const maxDuration = 60;
 
 const FALLBACK_USER_MESSAGE =
   "Something went wrong while generating a response. Please try again in a moment.";
