@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const regions = ["sin1"]; // Singapore
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
       contentType: response.headers.get("content-type"),
       isHTML: body.includes("<!doctype") || body.includes("<html"),
       body: body.substring(0, 400),
+      region: "sin1"
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
