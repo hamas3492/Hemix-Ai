@@ -17,7 +17,7 @@ export function Hero() {
       >
         <Badge variant="primary" className="mb-6 animate-pulse-glow">
           <img src="/assets/icon.png" alt="Hemix AI" className="w-3 h-3 rounded-full object-cover" />
-          Powered by 3 Premium Models
+          Powered by 3 AI Models
         </Badge>
 
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold text-white leading-tight tracking-tight text-balance">
