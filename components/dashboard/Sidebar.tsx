@@ -18,7 +18,6 @@ import {
   Trash2,
   Pencil,
   X,
-  Menu,
   ChevronLeft,
 } from "lucide-react";
 import { useChatStore } from "@/lib/store";
@@ -39,7 +38,12 @@ const NAV_ITEMS = [
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
+}
+
+export function Sidebar({ mobileOpen, onMobileOpenChange }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout } = useAuth();
@@ -55,14 +59,13 @@ export function Sidebar() {
   } = useChatStore();
 
   const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 200);
 
   const handleNewChat = () => {
-    createConversation("claude-opus-5");
-    setMobileOpen(false);
+    createConversation("claude-opus-4-8");
+    onMobileOpenChange(false);
   };
 
   const filtered = conversations.filter((c) => {
@@ -102,7 +105,7 @@ export function Sidebar() {
           <ChevronLeft className={cn("w-5 h-5 transition-transform", collapsed && "rotate-180")} />
         </button>
         <button
-          onClick={() => setMobileOpen(false)}
+          onClick={() => onMobileOpenChange(false)}
           className="lg:hidden text-muted hover:text-white"
         >
           <X className="w-5 h-5" />
@@ -150,7 +153,7 @@ export function Sidebar() {
                 collapsed={collapsed}
                 onClick={() => {
                   router.push(`/dashboard/chat?c=${conv.id}`);
-                  setMobileOpen(false);
+                  onMobileOpenChange(false);
                 }}
                 onDelete={() => deleteConversation(conv.id)}
                 onPin={() => pinConversation(conv.id)}
@@ -174,7 +177,7 @@ export function Sidebar() {
                 collapsed={collapsed}
                 onClick={() => {
                   router.push(`/dashboard/chat?c=${conv.id}`);
-                  setMobileOpen(false);
+                  onMobileOpenChange(false);
                 }}
                 onDelete={() => deleteConversation(conv.id)}
                 onPin={() => pinConversation(conv.id)}
@@ -210,7 +213,7 @@ export function Sidebar() {
                 active ? "bg-primary/10 text-primary" : "text-muted hover:text-white hover:bg-white/5",
                 collapsed && "justify-center"
               )}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => onMobileOpenChange(false)}
             >
               <Icon className="w-4 h-4 shrink-0" />
               {!collapsed && item.label}
@@ -241,14 +244,6 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile trigger */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-40 glass-strong rounded-lg p-2"
-      >
-        <Menu className="w-5 h-5 text-white" />
-      </button>
-
       {/* Desktop sidebar */}
       <aside
         className={cn(
@@ -267,7 +262,7 @@ export function Sidebar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => onMobileOpenChange(false)}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
             />
             <motion.aside

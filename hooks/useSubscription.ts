@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useChatStore } from "@/lib/store";
+import { paymentService } from "@/services/payment-service";
+import { DEFAULT_MODEL } from "@/lib/models";
 
 export type UpgradeReason = "limit" | "model" | "general";
 
@@ -21,7 +23,18 @@ export function useSubscription() {
   const storeUser = useChatStore((s) => s.user);
 
   const user = authContext?.user || storeUser;
-  const plan = user?.plan || "free";
+
+  // Source of truth for plan: the actual verified subscription record,
+  // not user.plan (which is never updated after payment verification).
+  // Only a subscription with status "active" counts as paid — "pending"
+  // (awaiting manual Payoneer verification) must NOT unlock premium.
+  const [plan, setPlan] = useState<"free" | "pro" | "enterprise">("free");
+
+  useEffect(() => {
+    const uid = user?.id || "guest_user";
+    const sub = paymentService.getSubscription(uid);
+    setPlan(sub && sub.status === "active" ? sub.plan : "free");
+  }, [user?.id]);
 
   const isFree = plan === "free";
   const isPro = plan === "pro";
@@ -73,7 +86,7 @@ export function useSubscription() {
   const canUseModel = useCallback(
     (modelId: string) => {
       if (plan === "pro" || plan === "enterprise") return true;
-      return modelId === "agentrouter/auto";
+      return modelId === DEFAULT_MODEL;
     },
     [plan]
   );
