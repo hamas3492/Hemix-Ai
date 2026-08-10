@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, ChevronDown, Cpu, Sparkles, Zap } from "lucide-react";
+import { Check, ChevronDown, Cpu, Sparkles, Zap, Bot } from "lucide-react";
 import { AI_MODELS } from "@/lib/models";
 import type { AIModel } from "@/types";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ interface ModelSelectorProps {
 }
 
 const MODEL_ICONS: Record<string, typeof Cpu> = {
+  "hemix-1": Bot,
   auto: Sparkles,
   "claude-opus-5": Cpu,
   "claude-opus-4-8": Zap,

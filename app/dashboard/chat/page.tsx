@@ -65,7 +65,7 @@ function ChatPage() {
 
     let convId = activeConversationId;
     if (!activeConv) {
-      convId = createConversation("auto");
+      convId = createConversation("hemix-1");
     }
 
     const userMessage: Message = {
@@ -103,7 +103,7 @@ function ChatPage() {
         headers: { "Content-Type": "application/json" },
         signal: abortRef.current.signal,
         body: JSON.stringify({
-          model: activeConv?.model || "auto",
+          model: activeConv?.model || "hemix-1",
           messages: [
             { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. You are Hemix AI, your own assistant. Keep answers short by default — a few sentences or a brief list. Only give a long detailed answer when the user explicitly asks for more detail, a full explanation, or a guide." },
             ...(activeConv?.messages || []).map((m) => ({
@@ -230,7 +230,7 @@ function ChatPage() {
             <Button
               variant="primary"
               size="lg"
-              onClick={() => createConversation("auto")}
+              onClick={() => createConversation("hemix-1")}
               className="bg-gradient-to-r from-primary to-secondary font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-[1.02]"
             >
               <img src="/assets/icon.png" alt="Hemix AI" className="w-4 h-4 rounded-full object-cover" />
@@ -247,7 +247,7 @@ function ChatPage() {
                 <button
                   key={i}
                   onClick={() => {
-                    createConversation("auto");
+                    createConversation("hemix-1");
                     setTimeout(() => setInput(s.desc), 200);
                   }}
                   className="glass-card p-3 sm:p-4 text-left hover:scale-[1.02] transition-transform"
@@ -277,7 +277,7 @@ function ChatPage() {
 
         <div className="flex items-center gap-2 shrink-0">
           <ModelSelector
-            value={activeConv.model || "auto"}
+            value={activeConv.model || "hemix-1"}
             onChange={(modelId) => {
               const updated = conversations.map((c) =>
                 c.id === activeConv.id ? { ...c, model: modelId } : c

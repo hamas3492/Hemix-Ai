@@ -2,6 +2,17 @@ import type { AIModel } from "@/types";
 
 export const AI_MODELS: AIModel[] = [
   {
+    id: "hemix-1",
+    name: "Hemix API",
+    provider: "agentrouter",
+    description: "Hemix's own AI model — fast, smart, and built by Hamas Ahmed.",
+    contextWindow: 200000,
+    inputPrice: 0,
+    outputPrice: 0,
+    capabilities: ["Chat", "Reasoning", "Writing", "Code"],
+    badge: "Default",
+  },
+  {
     id: "auto",
     name: "Auto",
     provider: "agentrouter",
@@ -10,7 +21,7 @@ export const AI_MODELS: AIModel[] = [
     inputPrice: 0,
     outputPrice: 0,
     capabilities: ["Auto", "Smart"],
-    badge: "Default",
+    badge: "Smart",
   },
   {
     id: "claude-opus-5",
@@ -55,4 +66,4 @@ export function getModelsByProvider(provider: string): AIModel[] {
   return AI_MODELS.filter((m) => m.provider === provider);
 }
 
-export const DEFAULT_MODEL = "claude-opus-4-8";
+export const DEFAULT_MODEL = "hemix-1";

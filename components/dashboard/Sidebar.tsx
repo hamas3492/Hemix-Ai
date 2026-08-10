@@ -58,7 +58,7 @@ export function Sidebar({ mobileOpen, onMobileOpenChange }: SidebarProps) {
   const debouncedSearch = useDebounce(searchQuery, 200);
 
   const handleNewChat = () => {
-    createConversation("auto");
+    createConversation("hemix-1");
     onMobileOpenChange(false);
   };
 

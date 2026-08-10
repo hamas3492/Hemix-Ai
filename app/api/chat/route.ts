@@ -29,9 +29,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // "auto" maps to the default model — user sees "Auto" in the UI
-    // but the API gets a real model id.
-    const resolvedModelId = modelId === "auto" ? "claude-opus-4-8" : modelId;
+    // Map virtual model IDs to real model IDs for the provider API.
+    // "auto" and "hemix-1" both route to a real model under the hood.
+    const MODEL_MAPPING: Record<string, string> = {
+      "auto": "claude-opus-4-8",
+      "hemix-1": "claude-opus-4-8",
+    };
+    const resolvedModelId = MODEL_MAPPING[modelId] || modelId;
+
     const model = getModelById(modelId);
     if (!model) {
       return NextResponse.json(
