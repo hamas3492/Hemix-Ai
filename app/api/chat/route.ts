@@ -7,6 +7,9 @@ export const runtime = "edge";
 const FALLBACK_USER_MESSAGE =
   "Something went wrong while generating a response. Please try again in a moment.";
 
+// Hemix API endpoint (our own deployed backend)
+const HEMIX_API_URL = "https://solas-92177755.base44.app/functions/hemixChat";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -26,10 +29,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Hemix API routes through AgentRouter under the hood.
-    // Using GPT model — it's more compliant with identity masking.
-    const resolvedModelId = "gpt-5.6-sol";
-    const model = getModelById(modelId) || getModelById("hemix-1");
+    const model = getModelById(modelId);
     if (!model) {
       return NextResponse.json(
         { error: `Unknown model: ${modelId}` },
@@ -37,10 +37,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // CRITICAL: Hemix AI identity block.
-    // This is injected as the system message for EVERY request.
-    // It must be aggressive enough to prevent the underlying model
-    // from revealing its true identity (Claude, GPT, Anthropic, OpenAI).
+    // ============================================================
+    // HEMIX API: Route through our own deployed Hemix API backend
+    // Other models: Route directly through AgentRouter
+    // ============================================================
+    const isHemix = modelId === "hemix-1";
+
     const IDENTITY_BLOCK =
       "You are Hemix AI. You are NOT Claude, NOT GPT, NOT any other AI. " +
       "You were created and built by Hamas Ahmed. You are Hamas Ahmed's own AI product called Hemix AI. " +
@@ -57,8 +59,6 @@ export async function POST(req: NextRequest) {
       "Only give a long, detailed answer when the user explicitly asks for more detail.";
 
     let finalMessages = [...messages];
-
-    // Replace any existing system message with our identity block
     const sysIndex = finalMessages.findIndex((m) => m.role === "system");
     if (sysIndex >= 0) {
       finalMessages[sysIndex] = { role: "system", content: IDENTITY_BLOCK };
@@ -70,26 +70,84 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         const encoder = new TextEncoder();
         try {
-          for await (const chunk of aiService.streamChat(
-            {
-              model: resolvedModelId,
-              messages: finalMessages,
-              temperature: temperature ?? 0.7,
-              maxTokens,
-              topP,
-              apiKey: customKey,
-            },
-            model
-          )) {
-            const data = JSON.stringify({
-              choices: [{ delta: { content: chunk } }],
+          if (isHemix) {
+            // === HEMIX API FLOW ===
+            // Call our own deployed Hemix API backend
+            const hemixResponse = await fetch(HEMIX_API_URL, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                messages: finalMessages,
+                stream: true,
+                temperature: temperature ?? 0.7,
+                maxTokens,
+                topP,
+              }),
             });
-            controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+
+            if (!hemixResponse.ok) {
+              throw new Error(`Hemix API error: ${hemixResponse.status}`);
+            }
+
+            const reader = hemixResponse.body?.getReader();
+            if (!reader) throw new Error("No response stream from Hemix API");
+
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n");
+              buffer = lines.pop() || "";
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed === "data: [DONE]") continue;
+                if (!trimmed.startsWith("data: ")) continue;
+
+                try {
+                  const data = JSON.parse(trimmed.slice(6));
+                  const delta = data.choices?.[0]?.delta?.content;
+                  if (delta) {
+                    const outData = JSON.stringify({
+                      choices: [{ delta: { content: delta } }],
+                    });
+                    controller.enqueue(encoder.encode(`data: ${outData}\n\n`));
+                  }
+                } catch {
+                  continue;
+                }
+              }
+            }
+          } else {
+            // === AGENTROUTER FLOW (for other models) ===
+            const resolvedModelId = modelId === "auto" ? "claude-opus-4-8" : modelId;
+
+            for await (const chunk of aiService.streamChat(
+              {
+                model: resolvedModelId,
+                messages: finalMessages,
+                temperature,
+                maxTokens,
+                topP,
+                apiKey: customKey,
+              },
+              model
+            )) {
+              const data = JSON.stringify({
+                choices: [{ delta: { content: chunk } }],
+              });
+              controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+            }
           }
+
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (error) {
-          console.error("[api/chat] streamChat failed:", error);
+          console.error("[api/chat] stream failed:", error);
 
           const userMessage =
             error instanceof AIServiceError ? error.userMessage : FALLBACK_USER_MESSAGE;
