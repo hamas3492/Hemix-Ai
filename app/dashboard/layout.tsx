@@ -41,15 +41,15 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar mobileOpen={mobileOpen} onMobileOpenChange={setMobileOpen} />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="lg:hidden flex items-center gap-3 h-14 px-4 glass border-b border-white/5 shrink-0">
+        <header className="lg:hidden flex items-center gap-3 h-12 px-4 glass border-b border-white/5 shrink-0 z-30">
           <button
             onClick={() => setMobileOpen(true)}
             className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
             aria-label="Open menu"
           >
-            <Menu className="w-5 h-5 text-white" />
+            <Menu className="w-5 h-5" style={{ color: 'var(--fg)' }} />
           </button>
-          <span className="text-sm font-semibold text-white">Hemix AI</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--fg)' }}>Hemix AI</span>
         </header>
         <main className="flex-1 overflow-hidden min-w-0">
           {children}

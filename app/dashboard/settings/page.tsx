@@ -54,9 +54,10 @@ export default function SettingsPage() {
             className={cn(
               "flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all",
               appSettings.theme === "dark"
-                ? "border-primary/50 bg-primary/10 text-white"
-                : "border-white/10 text-muted hover:text-white"
+                ? "border-primary/50 bg-primary/10"
+                : "border-white/10 hover:opacity-80"
             )}
+            style={{ color: appSettings.theme === "dark" ? 'var(--fg)' : 'var(--fg-muted)' }}
           >
             <Moon className="w-4 h-4" />
             Dark
@@ -67,9 +68,10 @@ export default function SettingsPage() {
             className={cn(
               "flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all",
               appSettings.theme === "light"
-                ? "border-primary/50 bg-primary/10 text-white"
-                : "border-white/10 text-muted hover:text-white"
+                ? "border-primary/50 bg-primary/10"
+                : "border-white/10 hover:opacity-80"
             )}
+            style={{ color: appSettings.theme === "light" ? 'var(--fg)' : 'var(--fg-muted)' }}
           >
             <Sun className="w-4 h-4" />
             Light
@@ -85,7 +87,8 @@ export default function SettingsPage() {
         <select
           value={appSettings.language}
           onChange={(e) => setAppSettings({ language: e.target.value })}
-          className="mt-4 w-full h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-primary/50"
+          className="mt-4 w-full h-11 px-4 rounded-xl border focus:outline-none focus:border-primary/50"
+          style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--fg)' }}
         >
           <option value="en">English</option>
           <option value="es">Español</option>
@@ -102,7 +105,7 @@ export default function SettingsPage() {
       description: "Manage your notification preferences",
       content: (
         <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-white">Enable notifications</span>
+          <span className="text-sm" style={{ color: 'var(--fg)' }}>Enable notifications</span>
           <button
             onClick={() => setAppSettings({ notifications: !appSettings.notifications })}
             className={cn(
@@ -126,7 +129,7 @@ export default function SettingsPage() {
       description: "Enable keyboard shortcuts for faster navigation",
       content: (
         <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-white">Enable shortcuts</span>
+          <span className="text-sm" style={{ color: 'var(--fg)' }}>Enable shortcuts</span>
           <button
             onClick={() => setAppSettings({ keyboardShortcuts: !appSettings.keyboardShortcuts })}
             className={cn(
@@ -152,7 +155,7 @@ export default function SettingsPage() {
         <div className="mt-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-sm text-white">Save conversation history</span>
+              <span className="text-sm" style={{ color: 'var(--fg)' }}>Save conversation history</span>
               <p className="text-xs text-muted mt-0.5">Store conversations locally for future reference</p>
             </div>
             <button
@@ -167,7 +170,7 @@ export default function SettingsPage() {
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-sm text-white">Share usage data</span>
+              <span className="text-sm" style={{ color: 'var(--fg)' }}>Share usage data</span>
               <p className="text-xs text-muted mt-0.5">Help improve Hemix AI by sharing anonymous data</p>
             </div>
             <button
@@ -186,11 +189,11 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="h-full overflow-y-auto p-4 sm:p-6">
       <div className="max-w-2xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl font-bold text-white mb-1">Settings</h1>
-          <p className="text-sm text-muted mb-8">Customize your Hemix AI experience</p>
+          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--fg)' }}>Settings</h1>
+          <p className="text-sm mb-8" style={{ color: 'var(--fg-muted)' }}>Customize your Hemix AI experience</p>
 
           <div className="space-y-4">
             {settings.map((s, i) => {
@@ -203,8 +206,8 @@ export default function SettingsPage() {
                         <Icon className="w-5 h-5 text-primary" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-base font-semibold text-white">{s.title}</h3>
-                        <p className="text-sm text-muted">{s.description}</p>
+                        <h3 className="text-base font-semibold" style={{ color: 'var(--fg)' }}>{s.title}</h3>
+                        <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>{s.description}</p>
                         {s.content}
                       </div>
                     </div>
@@ -221,11 +224,11 @@ export default function SettingsPage() {
                     <Check className="w-5 h-5 text-secondary" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-base font-semibold text-white">Chat Defaults</h3>
-                    <p className="text-sm text-muted">Default settings for new conversations</p>
+                    <h3 className="text-base font-semibold" style={{ color: 'var(--fg)' }}>Chat Defaults</h3>
+                    <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Default settings for new conversations</p>
                     <div className="mt-4 space-y-4">
                       <div>
-                        <label className="text-sm text-white">Temperature: {chatSettings.temperature}</label>
+                        <label className="text-sm" style={{ color: 'var(--fg)' }}>Temperature: {chatSettings.temperature}</label>
                         <input
                           type="range"
                           min={0}
@@ -237,7 +240,7 @@ export default function SettingsPage() {
                         />
                       </div>
                       <div>
-                        <label className="text-sm text-white">Max Tokens: {chatSettings.maxTokens}</label>
+                        <label className="text-sm" style={{ color: 'var(--fg)' }}>Max Tokens: {chatSettings.maxTokens}</label>
                         <input
                           type="range"
                           min={256}
@@ -249,7 +252,7 @@ export default function SettingsPage() {
                         />
                       </div>
                       <div>
-                        <label className="text-sm text-white">System Prompt</label>
+                        <label className="text-sm" style={{ color: 'var(--fg)' }}>System Prompt</label>
                         <textarea
                           value={chatSettings.systemPrompt}
                           onChange={(e) => setChatSettings({ systemPrompt: e.target.value })}
@@ -271,8 +274,8 @@ export default function SettingsPage() {
                     <Download className="w-5 h-5 text-blue-400" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-base font-semibold text-white">Export Data</h3>
-                    <p className="text-sm text-muted">Download all your conversations</p>
+                    <h3 className="text-base font-semibold" style={{ color: 'var(--fg)' }}>Export Data</h3>
+                    <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Download all your conversations</p>
                     <Button variant="outline" size="sm" className="mt-4" onClick={handleExportData}>
                       <Download className="w-4 h-4" />
                       Export All Data
@@ -290,8 +293,8 @@ export default function SettingsPage() {
                     <Trash2 className="w-5 h-5 text-red-400" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-base font-semibold text-white">Delete Account</h3>
-                    <p className="text-sm text-muted">Permanently delete your account and all data</p>
+                    <h3 className="text-base font-semibold" style={{ color: 'var(--fg)' }}>Delete Account</h3>
+                    <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>Permanently delete your account and all data</p>
                     <Button variant="destructive" size="sm" className="mt-4" onClick={handleDeleteAccount}>
                       <Trash2 className="w-4 h-4" />
                       Delete Account

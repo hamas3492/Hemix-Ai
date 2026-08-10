@@ -285,10 +285,10 @@ function ChatPage() {
               useChatStore.setState({ conversations: updated });
             }}
           />
-          <Button variant="ghost" size="icon" onClick={() => setShowSearch(!showSearch)} title="Search">
+          <Button variant="ghost" size="icon" onClick={() => setShowSearch(!showSearch)} title="Search" className="hidden sm:flex">
             <Search className="w-4 h-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleExport} title="Export">
+          <Button variant="ghost" size="icon" onClick={handleExport} title="Export" className="hidden sm:flex">
             <Download className="w-4 h-4" />
           </Button>
         </div>

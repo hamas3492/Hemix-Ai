@@ -90,7 +90,7 @@ export function Sidebar({ mobileOpen, onMobileOpenChange }: SidebarProps) {
           <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0">
             <img src="/assets/icon.png" alt="Hemix AI" className="w-full h-full object-cover" />
           </div>
-          {!collapsed && <span className="text-lg font-bold text-white">Hemix AI</span>}
+          {!collapsed && <span className="text-lg font-bold" style={{ color: "var(--fg)" }}>Hemix AI</span>}
         </Link>
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -128,7 +128,7 @@ export function Sidebar({ mobileOpen, onMobileOpenChange }: SidebarProps) {
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 pl-9 pr-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-muted/50 focus:outline-none focus:border-primary/50 transition-colors"
+              className="w-full h-9 pl-9 pr-3 rounded-lg border text-sm focus:outline-none focus:border-primary/50 transition-colors" style={{ background: "var(--input-bg)", borderColor: "var(--input-border)", color: "var(--fg)" }}
             />
           </div>
         </div>
@@ -223,8 +223,8 @@ export function Sidebar({ mobileOpen, onMobileOpenChange }: SidebarProps) {
           {!collapsed && (
             <>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{user?.name}</p>
-                <p className="text-xs text-muted truncate">{user?.email}</p>
+                <p className="text-sm font-medium truncate" style={{ color: "var(--fg)" }}>{user?.name}</p>
+                <p className="text-xs truncate" style={{ color: "var(--fg-muted)" }}>{user?.email}</p>
               </div>
               <button onClick={handleLogout} className="text-muted hover:text-red-400 transition-colors p-1">
                 <LogOut className="w-4 h-4" />
