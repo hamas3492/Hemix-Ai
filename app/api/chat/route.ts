@@ -38,10 +38,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Always enforce Hemix AI identity in the system prompt.
-    // NOTE: Do NOT mention competitor AI names in the system prompt —
-    // AgentRouter's content filter blocks them ("sensitive words detected").
-    // The model naturally denies being Claude when asked if it just knows
-    // it is Hemix AI by Hamas Ahmed.
+    // AgentRouter's content filter blocks many generic system prompts
+    // (e.g. "You are a helpful assistant." triggers "sensitive words detected").
+    // So we ALWAYS replace the system prompt with our safe identity block
+    // that has been tested to pass the filter. Custom prompts from the
+    // frontend are ignored to prevent filter errors.
     const IDENTITY_BLOCK =
       "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. " +
       "When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. " +
@@ -51,21 +52,12 @@ export async function POST(req: NextRequest) {
 
     let finalMessages = [...messages];
 
-    // Find and replace/prepend the system message
+    // Replace any existing system message with our safe identity block
     const sysIndex = finalMessages.findIndex((m) => m.role === "system");
     if (sysIndex >= 0) {
-      const userPrompt = finalMessages[sysIndex].content;
-      if (!userPrompt.includes("Hamas Ahmed")) {
-        finalMessages[sysIndex] = {
-          role: "system",
-          content: IDENTITY_BLOCK + " " + userPrompt,
-        };
-      }
+      finalMessages[sysIndex] = { role: "system", content: IDENTITY_BLOCK };
     } else {
-      finalMessages = [
-        { role: "system", content: IDENTITY_BLOCK },
-        ...messages,
-      ];
+      finalMessages = [{ role: "system", content: IDENTITY_BLOCK }, ...messages];
     }
 
     const stream = new ReadableStream({
