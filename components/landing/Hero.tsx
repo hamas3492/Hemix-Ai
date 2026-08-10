@@ -27,7 +27,7 @@ export function Hero() {
         </h1>
 
         <p className="mt-6 text-lg text-muted max-w-2xl text-balance">
-          The premium AI platform that brings GPT-5, Claude Sonnet 4.5, and more into one
+          The AI platform that brings powerful models into one
           beautiful, unified experience. Stream responses, write code, analyze files — all in real-time.
         </p>
 

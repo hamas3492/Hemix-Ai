@@ -16,7 +16,7 @@ export function Footer() {
               <span className="text-lg font-bold text-white">Hemix AI</span>
             </div>
             <p className="text-sm text-muted max-w-xs leading-relaxed">
-              Think Faster. Create Smarter. The premium AI platform for builders, creators, and thinkers.
+              Think Faster. Create Smarter. The AI platform for builders, creators, and thinkers.
             </p>
           </div>
 
