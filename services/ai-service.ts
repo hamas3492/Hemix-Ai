@@ -20,11 +20,6 @@ export interface ChatResponse {
   };
 }
 
-/**
- * Internal error carrying full diagnostic detail for server-side logs only.
- * Never expose `.detail` to end users — use `.userMessage` for anything
- * rendered in the UI.
- */
 export class AIServiceError extends Error {
   public readonly userMessage: string;
   public readonly detail: string;
@@ -41,7 +36,7 @@ const GENERIC_UNAVAILABLE_MESSAGE =
   "I'm having trouble connecting right now. Please try again in a moment.";
 
 const PROVIDER_CONFIGS: Partial<Record<ModelProvider, { baseUrl: string; envKey: string }>> = {
-  agentrouter: { baseUrl: "https://agentrouter.org/v1", envKey: "AGENTROUTER_API_KEY" },
+  agentrouter: { baseUrl: process.env.AGENTROUTER_PROXY_URL || "https://agentrouter.org/v1", envKey: "AGENTROUTER_API_KEY" },
 };
 
 export class AIService {
@@ -69,8 +64,9 @@ export class AIService {
   private getExtraHeaders(provider: ModelProvider): Record<string, string> {
     if (provider === "agentrouter") {
       return {
-        "HTTP-Referer": "https://hemix-ai.vercel.app",
-        "X-Title": "Hemix AI",
+        "Originator": "codex_cli_rs",
+        "User-Agent": "codex_cli_rs/0.101.0 (Mac OS 26.0.1; arm64) Apple_Terminal/464",
+        "Version": "0.101.0",
       };
     }
     return {};

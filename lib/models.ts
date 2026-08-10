@@ -2,36 +2,36 @@ import type { AIModel } from "@/types";
 
 export const AI_MODELS: AIModel[] = [
   {
-    id: "gpt-5",
-    name: "GPT-5",
+    id: "claude-opus-5",
+    name: "Claude Opus 5",
     provider: "agentrouter",
-    description: "OpenAI's most advanced model — superior reasoning, coding, and multimodal capabilities.",
-    contextWindow: 128000,
-    inputPrice: 10.0,
-    outputPrice: 30.0,
-    capabilities: ["Vision", "Code", "Reasoning", "Tools", "Multimodal"],
+    description: "Anthropic's most powerful model — elite reasoning, coding, and creative capabilities.",
+    contextWindow: 200000,
+    inputPrice: 15.0,
+    outputPrice: 75.0,
+    capabilities: ["Code", "Analysis", "Writing", "Vision", "Reasoning", "Tools"],
     badge: "Flagship",
   },
   {
-    id: "claude-sonnet-4-5-20250929",
-    name: "Claude Sonnet 4.5",
+    id: "claude-opus-4-8",
+    name: "Claude Opus 4.8",
     provider: "agentrouter",
-    description: "Anthropic's latest model with enhanced reasoning and creative writing.",
-    contextWindow: 1000000,
-    inputPrice: 6.0,
-    outputPrice: 30.0,
+    description: "Advanced reasoning and coding with exceptional long-context performance.",
+    contextWindow: 200000,
+    inputPrice: 10.0,
+    outputPrice: 40.0,
     capabilities: ["Code", "Analysis", "Writing", "Vision", "Reasoning"],
     badge: "New",
   },
   {
-    id: "claude-sonnet-4-20250514",
-    name: "Claude Sonnet 4",
+    id: "gpt-5.6-sol",
+    name: "GPT-5.6 Sol",
     provider: "agentrouter",
-    description: "Exceptional at coding, analysis, and long-context tasks.",
-    contextWindow: 200000,
-    inputPrice: 3.0,
-    outputPrice: 15.0,
-    capabilities: ["Code", "Analysis", "Writing", "Vision"],
+    description: "OpenAI's latest model with superior multimodal and coding capabilities.",
+    contextWindow: 128000,
+    inputPrice: 8.0,
+    outputPrice: 24.0,
+    capabilities: ["Vision", "Code", "Reasoning", "Tools", "Multimodal"],
     badge: "Best for Code",
   },
 ];
@@ -44,4 +44,4 @@ export function getModelsByProvider(provider: string): AIModel[] {
   return AI_MODELS.filter((m) => m.provider === provider);
 }
 
-export const DEFAULT_MODEL = "gpt-5";
+export const DEFAULT_MODEL = "claude-opus-5";

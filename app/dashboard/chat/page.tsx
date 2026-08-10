@@ -67,7 +67,7 @@ function ChatPage() {
 
     let convId = activeConversationId;
     if (!activeConv) {
-      convId = createConversation("gpt-5");
+      convId = createConversation("claude-opus-5");
     }
 
     const userMessage: Message = {
@@ -105,7 +105,7 @@ function ChatPage() {
         headers: { "Content-Type": "application/json" },
         signal: abortRef.current.signal,
         body: JSON.stringify({
-          model: "gpt-5",
+          model: "claude-opus-5",
           messages: [
             { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful, intelligent assistant. Provide clear, accurate, and well-formatted responses." },
             ...(activeConv?.messages || []).map((m) => ({
@@ -232,7 +232,7 @@ function ChatPage() {
             <Button
               variant="primary"
               size="lg"
-              onClick={() => createConversation("gpt-5")}
+              onClick={() => createConversation("claude-opus-5")}
               className="bg-gradient-to-r from-primary to-secondary font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-[1.02]"
             >
               <img src="/assets/icon.png" alt="Hemix AI" className="w-4 h-4 rounded-full object-cover" />
@@ -249,7 +249,7 @@ function ChatPage() {
                 <button
                   key={i}
                   onClick={() => {
-                    createConversation("gpt-5");
+                    createConversation("claude-opus-5");
                     setTimeout(() => setInput(s.desc), 200);
                   }}
                   className="glass-card p-3 sm:p-4 text-left hover:scale-[1.02] transition-transform"

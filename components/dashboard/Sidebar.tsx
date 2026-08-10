@@ -61,7 +61,7 @@ export function Sidebar() {
   const debouncedSearch = useDebounce(searchQuery, 200);
 
   const handleNewChat = () => {
-    createConversation("gpt-5");
+    createConversation("claude-opus-5");
     setMobileOpen(false);
   };
 
