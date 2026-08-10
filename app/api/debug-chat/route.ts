@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Use Node.js runtime (AWS Lambda) instead of Edge
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
@@ -15,15 +14,16 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://hemix-ai.vercel.app",
-        "X-Title": "Hemix AI",
+        "Authorization": `Bearer ${apiKey}`,
+        "Originator": "codex_cli_rs",
+        "User-Agent": "codex_cli_rs/0.101.0 (Mac OS 26.0.1; arm64) Apple_Terminal/464",
+        "Version": "0.101.0"
       },
       body: JSON.stringify({
-        model: "gpt-5",
+        model: "claude-opus-4-8",
         messages: [{ role: "user", content: "Say hello" }],
         max_tokens: 20,
-        stream: false,
+        stream: false
       }),
     });
 
@@ -32,9 +32,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       status: response.status,
       contentType: response.headers.get("content-type"),
-      body: body.substring(0, 500),
       isHTML: body.includes("<!doctype") || body.includes("<html"),
-      runtime: "nodejs",
+      body: body.substring(0, 400),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
