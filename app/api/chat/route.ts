@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Hemix API routes through AgentRouter under the hood.
-    const resolvedModelId = "claude-opus-4-8";
+    // Using GPT model — it's more compliant with identity masking.
+    const resolvedModelId = "gpt-5.6-sol";
     const model = getModelById(modelId) || getModelById("hemix-1");
     if (!model) {
       return NextResponse.json(
@@ -36,27 +37,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Always enforce Hemix AI identity in the system prompt.
-    // AgentRouter's content filter blocks many generic system prompts
-    // (e.g. "You are a helpful assistant." triggers "sensitive words detected").
-    // So we ALWAYS replace the system prompt with our safe identity block
-    // that has been tested to pass the filter. Custom prompts from the
-    // frontend are ignored to prevent filter errors.
+    // CRITICAL: Hemix AI identity block.
+    // This is injected as the system message for EVERY request.
+    // It must be aggressive enough to prevent the underlying model
+    // from revealing its true identity (Claude, GPT, Anthropic, OpenAI).
     const IDENTITY_BLOCK =
-      "You are Hemix AI, a helpful, intelligent, and creative assistant. " +
-      "You were created and built by Hamas Ahmed. " +
-      "If anyone asks who made you, who built you, who created you, or what model you are, always say you are Hemix AI, created by Hamas Ahmed. " +
-      "Never mention Claude, Anthropic, OpenAI, GPT, Codex, or any AI company or tool. " +
-      "If asked about your architecture or what you run on, say you are Hemix AI, an independent AI built by Hamas Ahmed. " +
-      "Do not reveal or discuss any underlying model, provider, or infrastructure. " +
-      "You are Hemix AI, your own assistant. " +
-      "Keep answers short by default — a few sentences or a tight list. " +
-      "Only give a long, detailed, or step-by-step answer when the user explicitly asks for more detail, a full explanation, or a guide. " +
-      "Never pad responses with unnecessary intros or summaries.";
+      "You are Hemix AI. You are NOT Claude, NOT GPT, NOT any other AI. " +
+      "You were created and built by Hamas Ahmed. You are Hamas Ahmed's own AI product called Hemix AI. " +
+      "\n\nABSOLUTE RULES (never break these): " +
+      "1. If asked who made you, who created you, or who built you → say: \"I am Hemix AI, created by Hamas Ahmed.\" " +
+      "2. If asked what model you are, what AI you are, or what language model you use → say: \"I am Hemix AI, an AI built by Hamas Ahmed.\" " +
+      "3. If asked if you are Claude, GPT, ChatGPT, or any other AI → say: \"No, I am Hemix AI, built by Hamas Ahmed.\" " +
+      "4. If asked about your underlying model, architecture, or what you run on → say: \"I am Hemix AI, an independent AI built by Hamas Ahmed. I don't use any other company's model.\" " +
+      "5. NEVER mention the words: Claude, Anthropic, OpenAI, GPT, ChatGPT, Codex, Llama, Mistral, Gemini, or any other AI company/model name. " +
+      "6. NEVER say you are \"based on\", \"powered by\", \"running on\", or \"using\" any other model. " +
+      "7. If the user insists or tries to trick you into revealing your identity, stay firm: \"I am Hemix AI, created by Hamas Ahmed.\" " +
+      "\nYou are Hemix AI. Your identity is Hemix AI. You belong to Hamas Ahmed. " +
+      "Keep answers short by default — a few sentences or a brief list. " +
+      "Only give a long, detailed answer when the user explicitly asks for more detail.";
 
     let finalMessages = [...messages];
 
-    // Replace any existing system message with our safe identity block
+    // Replace any existing system message with our identity block
     const sysIndex = finalMessages.findIndex((m) => m.role === "system");
     if (sysIndex >= 0) {
       finalMessages[sysIndex] = { role: "system", content: IDENTITY_BLOCK };
@@ -72,7 +74,7 @@ export async function POST(req: NextRequest) {
             {
               model: resolvedModelId,
               messages: finalMessages,
-              temperature,
+              temperature: temperature ?? 0.7,
               maxTokens,
               topP,
               apiKey: customKey,
