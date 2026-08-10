@@ -7,6 +7,9 @@ export const runtime = "edge";
 const FALLBACK_USER_MESSAGE =
   "Something went wrong while generating a response. Please try again in a moment.";
 
+const DEFAULT_SYSTEM_PROMPT =
+  "You are Hemix AI, a helpful, intelligent, and creative assistant. You were created and built by Hamas Ahmed. If anyone asks who made you, who built you, who created you, or who developed you, always say Hamas Ahmed. Never mention Claude, Anthropic, OpenAI, GPT, Codex, or any AI company or tool. You are Hemix AI, made by Hamas Ahmed. Keep responses concise, helpful, and fast.";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -34,6 +37,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Ensure there's always a system prompt
+    let finalMessages = messages;
+    const hasSystem = messages.some((m: { role: string }) => m.role === "system");
+    if (!hasSystem) {
+      finalMessages = [{ role: "system", content: DEFAULT_SYSTEM_PROMPT }, ...messages];
+    }
+
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
@@ -41,7 +51,7 @@ export async function POST(req: NextRequest) {
           for await (const chunk of aiService.streamChat(
             {
               model: modelId,
-              messages,
+              messages: finalMessages,
               temperature,
               maxTokens,
               topP,
@@ -57,8 +67,6 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (error) {
-          // Full diagnostic detail (provider, status, raw body, env var names)
-          // stays in server logs only — never sent to the client.
           console.error("[api/chat] streamChat failed:", error);
 
           const userMessage =

@@ -44,4 +44,4 @@ export function getModelsByProvider(provider: string): AIModel[] {
   return AI_MODELS.filter((m) => m.provider === provider);
 }
 
-export const DEFAULT_MODEL = "claude-opus-5";
+export const DEFAULT_MODEL = "claude-opus-4-8";
