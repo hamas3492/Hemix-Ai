@@ -2,6 +2,17 @@ import type { AIModel } from "@/types";
 
 export const AI_MODELS: AIModel[] = [
   {
+    id: "auto",
+    name: "Auto",
+    provider: "agentrouter",
+    description: "Automatically picks the best model for your query.",
+    contextWindow: 200000,
+    inputPrice: 0,
+    outputPrice: 0,
+    capabilities: ["Auto", "Smart"],
+    badge: "Default",
+  },
+  {
     id: "claude-opus-5",
     name: "Claude Opus 5",
     provider: "agentrouter",

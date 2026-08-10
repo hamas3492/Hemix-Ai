@@ -12,12 +12,8 @@ import {
   Search,
   Sparkles,
   X,
-  Lock,
-  Crown,
-  AlertCircle,
 } from "lucide-react";
 import { nanoid } from "nanoid";
-import { useRouter } from "next/navigation";
 import type { Message } from "@/types";
 import { useChatStore } from "@/lib/store";
 import { ChatBubble } from "@/components/ui/ChatBubble";
@@ -25,8 +21,7 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { showSuccess, showError } from "@/components/ui/Toast";
 import { useAutoScroll } from "@/hooks";
-import { useSubscription } from "@/hooks/useSubscription";
-import { UpgradeModal } from "@/components/dashboard/UpgradeModal";
+import { ModelSelector } from "@/components/dashboard/ModelSelector";
 import { downloadFile } from "@/lib/utils";
 
 export default function ChatPageWrapper() {
@@ -40,7 +35,6 @@ export default function ChatPageWrapper() {
 function ChatPage() {
   const searchParams = useSearchParams();
   const conversationId = searchParams.get("c");
-  const router = useRouter();
 
   const {
     conversations,
@@ -54,18 +48,6 @@ function ChatPage() {
     chatSettings,
     exportConversation,
   } = useChatStore();
-
-  const {
-    isFree,
-    dailyLimit,
-    messagesRemaining,
-    canSendMessage,
-    incrementMessageCount,
-    showUpgradePrompt,
-    openUpgradeModal,
-    closeUpgradeModal,
-    upgradeReason,
-  } = useSubscription();
 
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -81,16 +63,9 @@ function ChatPage() {
   const handleSend = useCallback(async () => {
     if (!input.trim() || isGenerating) return;
 
-    // Enforce the free-plan daily message limit — no premium usage without
-    // an active (verified) paid subscription.
-    if (!canSendMessage) {
-      openUpgradeModal("limit");
-      return;
-    }
-
     let convId = activeConversationId;
     if (!activeConv) {
-      convId = createConversation("claude-opus-4-8");
+      convId = createConversation("auto");
     }
 
     const userMessage: Message = {
@@ -107,7 +82,6 @@ function ChatPage() {
     };
 
     addMessage(convId!, userMessage);
-    incrementMessageCount();
     setInput("");
     setAttachments([]);
 
@@ -129,7 +103,7 @@ function ChatPage() {
         headers: { "Content-Type": "application/json" },
         signal: abortRef.current.signal,
         body: JSON.stringify({
-          model: "claude-opus-4-8",
+          model: activeConv?.model || "auto",
           messages: [
             { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. You are Hemix AI, your own assistant. Keep answers short by default — a few sentences or a brief list. Only give a long detailed answer when the user explicitly asks for more detail, a full explanation, or a guide." },
             ...(activeConv?.messages || []).map((m) => ({
@@ -211,9 +185,6 @@ function ChatPage() {
     updateMessage,
     setGenerating,
     chatSettings,
-    canSendMessage,
-    openUpgradeModal,
-    incrementMessageCount,
   ]);
 
   const handleStop = () => {
@@ -259,7 +230,7 @@ function ChatPage() {
             <Button
               variant="primary"
               size="lg"
-              onClick={() => createConversation("claude-opus-4-8")}
+              onClick={() => createConversation("auto")}
               className="bg-gradient-to-r from-primary to-secondary font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-[1.02]"
             >
               <img src="/assets/icon.png" alt="Hemix AI" className="w-4 h-4 rounded-full object-cover" />
@@ -276,7 +247,7 @@ function ChatPage() {
                 <button
                   key={i}
                   onClick={() => {
-                    createConversation("claude-opus-4-8");
+                    createConversation("auto");
                     setTimeout(() => setInput(s.desc), 200);
                   }}
                   className="glass-card p-3 sm:p-4 text-left hover:scale-[1.02] transition-transform"
@@ -304,7 +275,16 @@ function ChatPage() {
           <span className="text-sm text-white font-medium truncate">{activeConv.title}</span>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <ModelSelector
+            value={activeConv.model || "auto"}
+            onChange={(modelId) => {
+              const updated = conversations.map((c) =>
+                c.id === activeConv.id ? { ...c, model: modelId } : c
+              );
+              useChatStore.setState({ conversations: updated });
+            }}
+          />
           <Button variant="ghost" size="icon" onClick={() => setShowSearch(!showSearch)} title="Search">
             <Search className="w-4 h-4" />
           </Button>
@@ -367,31 +347,6 @@ function ChatPage() {
       {/* Input section */}
       <div className="border-t border-white/10 bg-[#050505]/90 px-3 sm:px-4 py-3 sm:py-4 backdrop-blur-xl shrink-0">
         <div className="max-w-3xl mx-auto">
-          {/* Free plan usage banner */}
-          {isFree && (
-            <div
-              className={`flex items-center justify-between gap-2 mb-2.5 px-3 py-2 rounded-lg border text-xs ${
-                messagesRemaining === 0
-                  ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
-                  : "bg-white/[0.03] border-white/10 text-muted"
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                <Lock className="w-3 h-3" />
-                {messagesRemaining === 0
-                  ? "Daily free limit reached — upgrade for unlimited messages"
-                  : `${messagesRemaining}/${dailyLimit} free messages left today`}
-              </span>
-              <button
-                onClick={() => router.push("/dashboard/billing")}
-                className="flex items-center gap-1 text-primary font-medium hover:text-primary/80 transition-colors shrink-0"
-              >
-                <Crown className="w-3 h-3" />
-                Upgrade
-              </button>
-            </div>
-          )}
-
           {/* Attachments list */}
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
@@ -422,14 +377,9 @@ function ChatPage() {
                     handleSend();
                   }
                 }}
-                disabled={!canSendMessage}
-                placeholder={
-                  canSendMessage
-                    ? "Ask anything... (Shift+Enter for new line)"
-                    : "Daily free limit reached — upgrade to keep chatting"
-                }
+                placeholder="Ask anything... (Shift+Enter for new line)"
                 rows={1}
-                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 rounded-2xl bg-white/5 border border-white/10 text-sm text-white placeholder:text-muted/50 resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 rounded-2xl bg-white/5 border border-white/10 text-sm text-white placeholder:text-muted/50 resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]"
                 style={{ height: "auto" }}
                 onInput={(e) => {
                   e.currentTarget.style.height = "auto";
@@ -451,19 +401,13 @@ function ChatPage() {
                 variant="primary"
                 size="icon"
                 onClick={handleSend}
-                disabled={!input.trim() || !canSendMessage}
+                disabled={!input.trim()}
                 className="rounded-2xl bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-md shadow-primary/20 shrink-0"
               >
                 <Send className="w-4 h-4" />
               </Button>
             )}
           </div>
-
-          <UpgradeModal
-            open={showUpgradePrompt}
-            onClose={closeUpgradeModal}
-            reason={upgradeReason}
-          />
 
           <p className="text-[10px] sm:text-xs text-muted/60 text-center mt-2">
             Hemix AI can make mistakes. Verify important information.

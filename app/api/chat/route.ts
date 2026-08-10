@@ -29,6 +29,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // "auto" maps to the default model — user sees "Auto" in the UI
+    // but the API gets a real model id.
+    const resolvedModelId = modelId === "auto" ? "claude-opus-4-8" : modelId;
     const model = getModelById(modelId);
     if (!model) {
       return NextResponse.json(
@@ -66,7 +69,7 @@ export async function POST(req: NextRequest) {
         try {
           for await (const chunk of aiService.streamChat(
             {
-              model: modelId,
+              model: resolvedModelId,
               messages: finalMessages,
               temperature,
               maxTokens,

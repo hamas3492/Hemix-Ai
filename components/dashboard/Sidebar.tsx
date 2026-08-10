@@ -10,9 +10,6 @@ import {
   Search,
   MessageSquare,
   Settings,
-  Cpu,
-  CreditCard,
-  Users,
   LogOut,
   Pin,
   Trash2,
@@ -32,9 +29,6 @@ import { showSuccess } from "@/components/ui/Toast";
 
 const NAV_ITEMS = [
   { label: "Chat", href: "/dashboard/chat", icon: MessageSquare },
-  { label: "Models", href: "/dashboard/models", icon: Cpu },
-  { label: "Workspace", href: "/dashboard/workspace", icon: Users },
-  { label: "Billing", href: "/dashboard/billing", icon: CreditCard },
   { label: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
@@ -64,7 +58,7 @@ export function Sidebar({ mobileOpen, onMobileOpenChange }: SidebarProps) {
   const debouncedSearch = useDebounce(searchQuery, 200);
 
   const handleNewChat = () => {
-    createConversation("claude-opus-4-8");
+    createConversation("auto");
     onMobileOpenChange(false);
   };
 
