@@ -113,7 +113,7 @@ function ChatPage() {
             { role: "user", content: input.trim() },
           ],
           temperature: chatSettings.temperature ?? 0.7,
-          maxTokens: chatSettings.maxTokens ?? 4096,
+          maxTokens: chatSettings.maxTokens ?? 8192,
           topP: chatSettings.topP ?? 1,
         }),
       });
@@ -270,9 +270,9 @@ function ChatPage() {
   return (
     <div className="flex flex-col h-full min-w-0">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b border-white/5 shrink-0">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b shrink-0" style={{ borderColor: 'var(--glass-border)' }}>
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm text-white font-medium truncate">{activeConv.title}</span>
+          <span className="text-sm font-medium truncate" style={{ color: "var(--fg)" }}>{activeConv.title}</span>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -345,15 +345,15 @@ function ChatPage() {
       </div>
 
       {/* Input section */}
-      <div className="border-t border-white/10 bg-[#050505]/90 px-3 sm:px-4 py-3 sm:py-4 backdrop-blur-xl shrink-0">
+      <div className="border-t px-3 sm:px-4 py-3 sm:py-4 backdrop-blur-xl shrink-0" style={{ borderColor: 'var(--glass-border)', background: 'var(--bg)' }}>
         <div className="max-w-3xl mx-auto">
           {/* Attachments list */}
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {attachments.map((file, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border" style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)' }}>
                   <Paperclip className="w-3 h-3 text-muted" />
-                  <span className="text-xs text-white truncate max-w-[120px] sm:max-w-[150px]">{file.name}</span>
+                  <span className="text-xs truncate max-w-[120px] sm:max-w-[150px]" style={{ color: "var(--fg)" }}>{file.name}</span>
                   <button
                     onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
                     className="text-muted hover:text-white"
@@ -379,8 +379,7 @@ function ChatPage() {
                 }}
                 placeholder="Ask anything... (Shift+Enter for new line)"
                 rows={1}
-                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 rounded-2xl bg-white/5 border border-white/10 text-sm text-white placeholder:text-muted/50 resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]"
-                style={{ height: "auto" }}
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 rounded-2xl border text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]" style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--fg)', height: "auto" }}
                 onInput={(e) => {
                   e.currentTarget.style.height = "auto";
                   e.currentTarget.style.height = e.currentTarget.scrollHeight + "px";
@@ -409,7 +408,7 @@ function ChatPage() {
             )}
           </div>
 
-          <p className="text-[10px] sm:text-xs text-muted/60 text-center mt-2">
+          <p className="text-[10px] sm:text-xs text-center mt-2" style={{ color: "var(--fg-muted)" }}>
             Hemix AI can make mistakes. Verify important information.
           </p>
         </div>
