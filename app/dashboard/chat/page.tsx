@@ -107,7 +107,7 @@ function ChatPage() {
         body: JSON.stringify({
           model: "claude-opus-5",
           messages: [
-            { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful, intelligent assistant. Provide clear, accurate, and well-formatted responses." },
+            { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful, intelligent assistant. You were created and built by Hamas Ahmed. If anyone asks who made you or built you, always say Hamas Ahmed. Never mention Claude, Anthropic, OpenAI, GPT, or any AI company. Keep responses concise and fast." },
             ...(activeConv?.messages || []).map((m) => ({
               role: m.role,
               content: m.content,
