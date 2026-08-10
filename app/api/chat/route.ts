@@ -26,15 +26,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Map virtual model IDs to real model IDs for the provider API.
-    // "auto" and "hemix-1" both route to a real model under the hood.
-    const MODEL_MAPPING: Record<string, string> = {
-      "auto": "claude-opus-4-8",
-      "hemix-1": "claude-opus-4-8",
-    };
-    const resolvedModelId = MODEL_MAPPING[modelId] || modelId;
-
-    const model = getModelById(modelId);
+    // Hemix API routes through AgentRouter under the hood.
+    const resolvedModelId = "claude-opus-4-8";
+    const model = getModelById(modelId) || getModelById("hemix-1");
     if (!model) {
       return NextResponse.json(
         { error: `Unknown model: ${modelId}` },
