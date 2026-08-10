@@ -37,11 +37,37 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Ensure there's always a system prompt
-    let finalMessages = messages;
-    const hasSystem = messages.some((m: { role: string }) => m.role === "system");
-    if (!hasSystem) {
-      finalMessages = [{ role: "system", content: DEFAULT_SYSTEM_PROMPT }, ...messages];
+    // Always enforce Hemix AI identity in the system prompt.
+    // The identity block is prepended so it takes priority over any
+    // stale/custom prompt the frontend may send.
+    const IDENTITY_BLOCK =
+      "CRITICAL IDENTITY RULE: You are Hemix AI, created and built by Hamas Ahmed. " +
+      "If anyone asks who made you, built you, created you, or developed you, the answer is ALWAYS Hamas Ahmed. " +
+      "You must NEVER say you are Claude, Claude Code, or built on Claude. " +
+      "You must NEVER mention Anthropic, OpenAI, GPT, Codex, or any AI company. " +
+      "You are Hemix AI and your creator is Hamas Ahmed — no exceptions.";
+
+    const SHORT_ANSWER_RULE =
+      " Keep answers SHORT by default (a few sentences). Only give long detailed answers when the user explicitly asks for more detail.";
+
+    let finalMessages = [...messages];
+
+    // Find and replace/prepend the system message
+    const sysIndex = finalMessages.findIndex((m) => m.role === "system");
+    if (sysIndex >= 0) {
+      const userPrompt = finalMessages[sysIndex].content;
+      // If the existing prompt already has the identity block, leave it
+      if (!userPrompt.includes("Hamas Ahmed")) {
+        finalMessages[sysIndex] = {
+          role: "system",
+          content: IDENTITY_BLOCK + SHORT_ANSWER_RULE + " " + userPrompt,
+        };
+      }
+    } else {
+      finalMessages = [
+        { role: "system", content: IDENTITY_BLOCK + SHORT_ANSWER_RULE },
+        ...messages,
+      ];
     }
 
     const stream = new ReadableStream({

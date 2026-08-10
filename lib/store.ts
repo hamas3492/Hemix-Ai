@@ -225,6 +225,13 @@ export const useChatStore = create<ChatStore>()(
     }),
     {
       name: "hemix-storage",
+      version: 2,
+      migrate: (persisted: any, version: number) => {
+        if (version < 2 && persisted?.chatSettings) {
+          persisted.chatSettings.systemPrompt = undefined;
+        }
+        return persisted;
+      },
     }
   )
 );
