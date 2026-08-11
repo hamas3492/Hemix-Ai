@@ -100,8 +100,8 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast }: 
               <div
                 className="rounded-2xl px-4 py-2.5 text-sm"
                 style={{
-                  background: "rgba(139, 92, 246, 0.12)",
-                  border: "1px solid rgba(139, 92, 246, 0.2)",
+                  background: "transparent",
+                  border: "1px solid var(--input-border)",
                   color: "var(--fg)",
                 }}
               >

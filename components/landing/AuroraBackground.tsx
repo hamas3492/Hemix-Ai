@@ -9,15 +9,15 @@ export function AuroraBackground() {
       {/* Aurora blobs */}
       <div
         className="absolute top-[-10%] left-[-5%] w-[60%] h-[60%] rounded-full opacity-30 blur-[120px] animate-aurora-1"
-        style={{ background: "radial-gradient(circle, #8B5CF6, transparent 70%)" }}
+        style={{ background: "radial-gradient(circle, #3B82F6, transparent 70%)" }}
       />
       <div
         className="absolute top-[20%] right-[-10%] w-[50%] h-[50%] rounded-full opacity-20 blur-[120px] animate-aurora-2"
-        style={{ background: "radial-gradient(circle, #06B6D4, transparent 70%)" }}
+        style={{ background: "radial-gradient(circle, #14B8A6, transparent 70%)" }}
       />
       <div
         className="absolute bottom-[-10%] left-[20%] w-[55%] h-[55%] rounded-full opacity-15 blur-[120px] animate-aurora-3"
-        style={{ background: "radial-gradient(circle, #8B5CF6, transparent 70%)" }}
+        style={{ background: "radial-gradient(circle, #3B82F6, transparent 70%)" }}
       />
 
       {/* Grid overlay */}

@@ -21,7 +21,6 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { showSuccess, showError } from "@/components/ui/Toast";
 import { useAutoScroll } from "@/hooks";
-import { ModelSelector } from "@/components/dashboard/ModelSelector";
 import { downloadFile } from "@/lib/utils";
 
 export default function ChatPageWrapper() {
@@ -276,15 +275,6 @@ function ChatPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <ModelSelector
-            value={activeConv.model || "hemix-1"}
-            onChange={(modelId) => {
-              const updated = conversations.map((c) =>
-                c.id === activeConv.id ? { ...c, model: modelId } : c
-              );
-              useChatStore.setState({ conversations: updated });
-            }}
-          />
           <Button variant="ghost" size="icon" onClick={() => setShowSearch(!showSearch)} title="Search" className="hidden sm:flex">
             <Search className="w-4 h-4" />
           </Button>
@@ -377,7 +367,7 @@ function ChatPage() {
                     handleSend();
                   }
                 }}
-                placeholder="Ask anything... (Shift+Enter for new line)"
+                placeholder="Ask anything..."
                 rows={1}
                 className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 rounded-2xl border text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]" style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--fg)', height: "auto" }}
                 onInput={(e) => {

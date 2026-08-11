@@ -38,10 +38,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
       <Sidebar mobileOpen={mobileOpen} onMobileOpenChange={setMobileOpen} />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <header className="lg:hidden flex items-center gap-3 h-12 px-4 glass border-b border-white/5 shrink-0 z-30">
+        <header className="lg:hidden flex items-center gap-3 h-12 px-4 glass border-b shrink-0 z-30" style={{ borderColor: "var(--glass-border)" }}>
           <button
             onClick={() => setMobileOpen(true)}
             className="p-1.5 rounded-lg hover:bg-white/5 transition-colors"
