@@ -22,6 +22,9 @@ export interface Message {
   status?: "sending" | "streaming" | "complete" | "error";
   attachments?: FileAttachment[];
   edited?: boolean;
+  type?: "text" | "image" | "file";
+  imageUrl?: string;
+  imagePrompt?: string;
 }
 
 export interface FileAttachment {

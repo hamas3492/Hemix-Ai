@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 export * from "./useSubscription";
+export { useVoiceInput, useSpeech } from "./useVoice";
 
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(false);

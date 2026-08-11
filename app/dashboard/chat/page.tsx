@@ -12,6 +12,10 @@ import {
   Search,
   Sparkles,
   X,
+  Mic,
+  MicOff,
+  ImageIcon,
+  MessageSquare,
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import type { Message } from "@/types";
@@ -20,7 +24,7 @@ import { ChatBubble } from "@/components/ui/ChatBubble";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { showSuccess, showError } from "@/components/ui/Toast";
-import { useAutoScroll } from "@/hooks";
+import { useAutoScroll, useVoiceInput } from "@/hooks";
 import { downloadFile } from "@/lib/utils";
 
 export default function ChatPageWrapper() {
@@ -52,15 +56,87 @@ function ChatPage() {
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [imageMode, setImageMode] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const { listening, supported: voiceSupported, start: startListening, stop: stopListening } = useVoiceInput();
   const messagesEndRef = useAutoScroll<HTMLDivElement>([conversations]);
 
   const activeConv = conversations.find(
     (c) => c.id === (conversationId || activeConversationId)
   );
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachments((prev) => [...prev, ...files]);
+  };
+
+  const handleImageGenerate = useCallback(async (prompt: string) => {
+    if (!prompt.trim() || generatingImage) return;
+
+    let convId = activeConversationId;
+    if (!activeConv) {
+      convId = createConversation("hemix-1");
+    }
+
+    // User message showing the prompt
+    const userMessage: Message = {
+      id: nanoid(),
+      role: "user",
+      content: `🎨 Generate image: ${prompt.trim()}`,
+      createdAt: new Date().toISOString(),
+      type: "text",
+    };
+    addMessage(convId!, userMessage);
+    setInput("");
+    setGeneratingImage(true);
+
+    // Placeholder assistant message
+    const imgMessage: Message = {
+      id: nanoid(),
+      role: "assistant",
+      content: "",
+      createdAt: new Date().toISOString(),
+      status: "streaming",
+      type: "image",
+      imagePrompt: prompt.trim(),
+    };
+    addMessage(convId!, imgMessage);
+
+    try {
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: prompt.trim() }),
+      });
+
+      if (!res.ok) throw new Error("Image generation failed");
+
+      const data = await res.json();
+      updateMessage(convId!, imgMessage.id, {
+        imageUrl: data.url,
+        content: "",
+        status: "complete",
+      });
+    } catch {
+      updateMessage(convId!, imgMessage.id, {
+        content: "Sorry, I couldn\'t generate that image. Please try again.",
+        status: "error",
+        type: "text",
+      });
+    } finally {
+      setGeneratingImage(false);
+    }
+  }, [input, generatingImage, activeConv, activeConversationId, createConversation, addMessage, updateMessage]);
+
+
   const handleSend = useCallback(async () => {
     if (!input.trim() || isGenerating) return;
+
+    if (imageMode) {
+      handleImageGenerate(input);
+      return;
+    }
 
     let convId = activeConversationId;
     if (!activeConv) {
@@ -184,6 +260,8 @@ function ChatPage() {
     updateMessage,
     setGenerating,
     chatSettings,
+    imageMode,
+    handleImageGenerate,
   ]);
 
   const handleStop = () => {
@@ -206,11 +284,6 @@ function ChatPage() {
     const content = exportConversation(activeConv.id);
     downloadFile(content, `${activeConv.title.replace(/\s+/g, "-").toLowerCase()}.md`, "text/markdown");
     showSuccess("Conversation exported");
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setAttachments((prev) => [...prev, ...files]);
   };
 
   if (!activeConv) {
@@ -236,12 +309,12 @@ function ChatPage() {
               Start New Chat
             </Button>
 
-            <div className="mt-8 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+            <div className="mt-8 sm:mt-12 grid grid-cols-2 gap-3 text-left">
               {[
                 { title: "Write code", desc: "Build a REST API with Express" },
+                { title: "Generate image", desc: "A futuristic city at sunset" },
                 { title: "Get creative", desc: "Write a short story about space" },
-                { title: "Analyze data", desc: "Help me understand this CSV" },
-                { title: "Learn something", desc: "Explain quantum computing" },
+                { title: "Voice chat", desc: "Tap the mic and speak" },
               ].map((s, i) => (
                 <button
                   key={i}
@@ -355,6 +428,26 @@ function ChatPage() {
             </div>
           )}
 
+          {/* Mode toggle bar */}
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={() => setImageMode(false)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${!imageMode ? "bg-primary/15 text-primary border border-primary/30" : "border border-transparent"}`}
+              style={!imageMode ? {} : { color: "var(--fg-muted)" }}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Chat</span>
+            </button>
+            <button
+              onClick={() => setImageMode(true)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${imageMode ? "bg-primary/15 text-primary border border-primary/30" : "border border-transparent"}`}
+              style={imageMode ? {} : { color: "var(--fg-muted)" }}
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Image</span>
+            </button>
+          </div>
+
           {/* Textarea & Send button */}
           <div className="flex items-end gap-2">
             <div className="flex-1 relative min-w-0">
@@ -367,22 +460,40 @@ function ChatPage() {
                     handleSend();
                   }
                 }}
-                placeholder="Ask anything..."
+                placeholder={imageMode ? "Describe the image you want..." : "Ask anything..."}
                 rows={1}
-                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-10 sm:pr-12 rounded-2xl border text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]" style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--fg)', height: "auto" }}
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-16 sm:pr-20 rounded-2xl border text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]" style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--fg)', height: "auto" }}
                 onInput={(e) => {
                   e.currentTarget.style.height = "auto";
                   e.currentTarget.style.height = e.currentTarget.scrollHeight + "px";
                 }}
               />
-              <label className="absolute right-2 sm:right-3 bottom-2.5 sm:bottom-3 cursor-pointer">
-                <input type="file" multiple className="hidden" onChange={handleFileSelect} />
-                <Paperclip className="w-4 h-4 text-muted hover:text-white transition-colors" />
-              </label>
+              <div className="absolute right-2 sm:right-3 bottom-2.5 sm:bottom-3 flex items-center gap-2">
+                {voiceSupported && (
+                  <button
+                    onClick={() => {
+                      if (listening) {
+                        stopListening();
+                      } else {
+                        startListening((text) => setInput(text));
+                      }
+                    }}
+                    className="transition-colors"
+                    style={{ color: listening ? "#3b82f6" : "var(--fg-muted)" }}
+                    title={listening ? "Stop recording" : "Voice input"}
+                  >
+                    {listening ? <MicOff className="w-4 h-4 animate-pulse" /> : <Mic className="w-4 h-4 hover:text-white" />}
+                  </button>
+                )}
+                <label className="cursor-pointer">
+                  <input type="file" multiple className="hidden" onChange={handleFileSelect} />
+                  <Paperclip className="w-4 h-4 hover:text-white transition-colors" style={{ color: "var(--fg-muted)" }} />
+                </label>
+              </div>
             </div>
 
-            {isGenerating ? (
-              <Button variant="destructive" size="icon" onClick={handleStop} className="rounded-2xl shrink-0">
+            {isGenerating || generatingImage ? (
+              <Button variant="destructive" size="icon" onClick={imageMode ? () => setGeneratingImage(false) : handleStop} className="rounded-2xl shrink-0">
                 <Square className="w-4 h-4" />
               </Button>
             ) : (
@@ -393,7 +504,7 @@ function ChatPage() {
                 disabled={!input.trim()}
                 className="rounded-2xl bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-md shadow-primary/20 shrink-0"
               >
-                <Send className="w-4 h-4" />
+                {imageMode ? <ImageIcon className="w-4 h-4" /> : <Send className="w-4 h-4" />}
               </Button>
             )}
           </div>
