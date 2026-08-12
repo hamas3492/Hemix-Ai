@@ -8,22 +8,23 @@ const HEMIX_IMAGE_API = "https://solas-92177755.base44.app/functions/hemixGenera
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { prompt, width, height } = body;
+    const { prompt } = body;
 
     if (!prompt || typeof prompt !== "string") {
-      return NextResponse.json(
-        { error: "Prompt is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
+
+    // Use higher resolution for better quality
+    const width = body.width ?? 1024;
+    const height = body.height ?? 1024;
 
     const response = await fetch(HEMIX_IMAGE_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         prompt: prompt.trim(),
-        width: width ?? 1024,
-        height: height ?? 1024,
+        width,
+        height,
       }),
     });
 
@@ -52,9 +53,6 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("[api/generate-image] error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate image" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to generate image" }, { status: 500 });
   }
 }

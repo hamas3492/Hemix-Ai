@@ -4,16 +4,8 @@ import { useState, useRef, useCallback, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Send,
-  Square,
-  Paperclip,
-  Download,
-  Search,
-  X,
-  Mic,
-  MicOff,
-  Image as ImageIcon,
-  Volume2,
+  Send, Square, Paperclip, Download, Search, X,
+  Mic, MicOff, Volume2,
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import type { Message } from "@/types";
@@ -33,6 +25,29 @@ export default function ChatPageWrapper() {
   );
 }
 
+// Auto-detect if user is asking for an image
+function isImageRequest(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  // Pattern 1: "generate/create/make/draw/design" ... "image/picture/photo/art/illustration"
+  const p1 = /(\bgenerate\b|\bcreate\b|\bmake\b|\bdraw\b|\bdesign\b).*(\bimage\b|\bpicture\b|\bphoto\b|\bart\b|\billustration\b|\bdrawing\b)/.test(lower);
+  // Pattern 2: "image/picture/photo/art" ... "generate/create/make"
+  const p2 = /(\bimage\b|\bpicture\b|\bphoto\b|\bart\b).*(\bgenerate\b|\bcreate\b|\bmake\b|\bdraw\b)/.test(lower);
+  // Pattern 3: starts with "draw" (e.g. "draw a cat")
+  const p3 = /^draw\b/.test(lower);
+  // Pattern 4: "generate a photo of" / "create an image of" etc.
+  const p4 = /\b(generate|create|make)\s+(me\s+)?(a|an)\s+(photo|image|picture|drawing|illustration|painting)\b/.test(lower);
+  return p1 || p2 || p3 || p4;
+}
+
+// Extract the actual image prompt from user message
+function extractImagePrompt(text: string): string {
+  // Remove the command part and keep the description
+  return text
+    .replace(/^(generate|create|make|draw|design)\s+(me\s+)?(a|an|the)?\s*(image|picture|photo|art|illustration|drawing|painting)?\s*(of|showing|depicting|with|that|which|featuring)?\s*/i, "")
+    .replace(/^(please\s+)?(can you\s+)?/i, "")
+    .trim() || text.trim();
+}
+
 async function readFileContent(file: File): Promise<string | null> {
   const textTypes = ["text/", "application/json", "application/xml", "application/javascript", "application/typescript"];
   const textExtensions = [".txt", ".md", ".json", ".xml", ".js", ".ts", ".tsx", ".jsx", ".py", ".java", ".c", ".cpp", ".html", ".css", ".scss", ".yml", ".yaml", ".sh", ".sql", ".csv", ".env", ".gitignore"];
@@ -46,23 +61,15 @@ function ChatPage() {
   const conversationId = searchParams.get("c");
 
   const {
-    conversations,
-    activeConversationId,
-    createConversation,
-    addMessage,
-    updateMessage,
-    deleteMessage,
-    isGenerating,
-    setGenerating,
-    chatSettings,
-    exportConversation,
+    conversations, activeConversationId, createConversation,
+    addMessage, updateMessage, deleteMessage,
+    isGenerating, setGenerating, chatSettings, exportConversation,
   } = useChatStore();
 
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showSearch, setShowSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [imageMode, setImageMode] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState(0);
   const [showVoicePicker, setShowVoicePicker] = useState(false);
@@ -71,9 +78,7 @@ function ChatPage() {
   const { listening, supported: voiceSupported, start: startListening, stop: stopListening } = useVoiceInput();
   const messagesEndRef = useAutoScroll<HTMLDivElement>([conversations]);
 
-  const activeConv = conversations.find(
-    (c) => c.id === (conversationId || activeConversationId)
-  );
+  const activeConv = conversations.find((c) => c.id === (conversationId || activeConversationId));
 
   useEffect(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -91,61 +96,49 @@ function ChatPage() {
     setAttachments((prev) => [...prev, ...files]);
   };
 
-  const handleImageGenerate = useCallback(async (prompt: string) => {
-    if (!prompt.trim() || generatingImage) return;
-
-    let convId = activeConversationId;
-    if (!activeConv) convId = createConversation("hemix-1");
-
-    const userMessage: Message = {
-      id: nanoid(), role: "user",
-      content: prompt.trim(),
-      createdAt: new Date().toISOString(), type: "text",
-    };
-    addMessage(convId!, userMessage);
-    setInput("");
+  // === IMAGE GENERATION — called from chat, no separate mode ===
+  const handleImageGenerate = useCallback(async (prompt: string, convId: string) => {
     setGeneratingImage(true);
+    const cleanPrompt = extractImagePrompt(prompt);
 
+    // Loading bubble — picture-sized, "Generating picture..."
     const imgMessage: Message = {
       id: nanoid(), role: "assistant", content: "",
-      createdAt: new Date().toISOString(), status: "streaming",
-      type: "image", imagePrompt: prompt.trim(),
+      createdAt: new Date().toISOString(),
+      status: "streaming", type: "image",
+      imagePrompt: cleanPrompt,
     };
-    addMessage(convId!, imgMessage);
+    addMessage(convId, imgMessage);
 
     try {
       const res = await fetch("/api/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim() }),
+        body: JSON.stringify({ prompt: cleanPrompt }),
       });
       if (!res.ok) throw new Error("Image generation failed");
       const data = await res.json();
-      updateMessage(convId!, imgMessage.id, {
+      // Reveal image — ChatBubble will fade-in the image
+      updateMessage(convId, imgMessage.id, {
         imageUrl: data.url, content: "", status: "complete",
       });
     } catch {
-      updateMessage(convId!, imgMessage.id, {
+      updateMessage(convId, imgMessage.id, {
         content: "Sorry, I couldn't generate that image. Please try again.",
         status: "error", type: "text",
       });
     } finally {
       setGeneratingImage(false);
     }
-  }, [generatingImage, activeConv, activeConversationId, createConversation, addMessage, updateMessage]);
+  }, [addMessage, updateMessage]);
 
   const handleSend = useCallback(async () => {
-    if (!input.trim() || isGenerating) return;
-
-    if (imageMode) {
-      handleImageGenerate(input);
-      setImageMode(false);
-      return;
-    }
+    if (!input.trim() || isGenerating || generatingImage) return;
 
     let convId = activeConversationId;
     if (!activeConv) convId = createConversation("hemix-1");
 
+    // Read file contents
     let fileContents: string[] = [];
     for (const file of attachments) {
       const content = await readFileContent(file);
@@ -158,9 +151,17 @@ function ChatPage() {
       attachments: attachments.map((f) => ({ id: nanoid(), name: f.name, type: f.type, size: f.size })),
     };
     addMessage(convId!, userMessage);
+
     const currentInput = input.trim();
     setInput(""); setAttachments([]);
 
+    // === AUTO-DETECT: is this an image request? ===
+    if (isImageRequest(currentInput)) {
+      await handleImageGenerate(currentInput, convId!);
+      return;
+    }
+
+    // === NORMAL CHAT ===
     const assistantMessage: Message = {
       id: nanoid(), role: "assistant", content: "",
       createdAt: new Date().toISOString(), status: "streaming",
@@ -232,7 +233,7 @@ function ChatPage() {
       setGenerating(false);
       abortRef.current = null;
     }
-  }, [input, attachments, isGenerating, activeConv, activeConversationId, createConversation, addMessage, updateMessage, setGenerating, chatSettings, imageMode, handleImageGenerate]);
+  }, [input, attachments, isGenerating, generatingImage, activeConv, activeConversationId, createConversation, addMessage, updateMessage, setGenerating, chatSettings, handleImageGenerate]);
 
   const handleStop = () => { abortRef.current?.abort(); setGenerating(false); };
 
@@ -273,7 +274,7 @@ function ChatPage() {
             <div className="mt-8 sm:mt-12 grid grid-cols-2 gap-3 text-left">
               {[
                 { title: "Write code", desc: "Build a REST API with Express" },
-                { title: "Generate image", desc: "A futuristic city at sunset" },
+                { title: "Generate image", desc: "Generate an image of a sunset" },
                 { title: "Get creative", desc: "Write a short story about space" },
                 { title: "Voice chat", desc: "Tap mic and speak to Hemix" },
               ].map((s, i) => (
@@ -303,7 +304,7 @@ function ChatPage() {
           <span className="text-sm font-medium truncate" style={{ color: "var(--fg)" }}>{activeConv.title}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {/* Voice selector */}
+          {/* Voice selector dropdown */}
           <div className="relative">
             <Button variant="ghost" size="icon" onClick={() => setShowVoicePicker(!showVoicePicker)} title="Select voice" className="hidden sm:flex">
               <Volume2 className="w-4 h-4" />
@@ -378,7 +379,7 @@ function ChatPage() {
         </div>
       </div>
 
-      {/* Input section — unified, no mode toggle */}
+      {/* Input section — unified, no mode toggle, no image icon */}
       <div className="border-t px-3 sm:px-4 py-3 sm:py-4 backdrop-blur-xl shrink-0"
         style={{ borderColor: 'var(--glass-border)', background: 'var(--bg)' }}>
         <div className="max-w-3xl mx-auto">
@@ -398,36 +399,19 @@ function ChatPage() {
             </div>
           )}
 
-          {/* Image mode indicator */}
-          {imageMode && (
-            <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
-              <ImageIcon className="w-3.5 h-3.5 text-primary" />
-              <span className="text-xs text-primary">Image mode — type a prompt and send to generate an image</span>
-              <button onClick={() => setImageMode(false)} className="ml-auto text-muted hover:text-white">
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-
           {/* Textarea & buttons */}
           <div className="flex items-end gap-2">
             <div className="flex-1 relative min-w-0">
               <textarea value={input} onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                placeholder={imageMode ? "Describe the image you want..." : "Ask anything... (tap image icon to generate images)"}
+                placeholder="Ask anything... (say 'generate an image of...' to create images)"
                 rows={1}
-                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-24 sm:pr-28 rounded-2xl border text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]"
-                style={{ background: 'var(--input-bg)', borderColor: imageMode ? 'var(--primary, #3b82f6)' : 'var(--input-border)', color: 'var(--fg)', height: "auto" }}
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-20 sm:pr-24 rounded-2xl border text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]"
+                style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--fg)', height: "auto" }}
                 onInput={(e) => { e.currentTarget.style.height = "auto"; e.currentTarget.style.height = e.currentTarget.scrollHeight + "px"; }} />
               {/* Right side icons inside textarea */}
               <div className="absolute right-2 sm:right-3 bottom-2.5 sm:bottom-3 flex items-center gap-2">
-                {/* Image toggle */}
-                <button onClick={() => setImageMode(!imageMode)}
-                  className="transition-colors" style={{ color: imageMode ? "#3b82f6" : "var(--fg-muted)" }}
-                  title={imageMode ? "Exit image mode" : "Generate image"}>
-                  <ImageIcon className="w-4 h-4 hover:text-white" />
-                </button>
-                {/* Voice input */}
+                {/* Voice input mic */}
                 {voiceSupported && (
                   <button onClick={() => { if (listening) stopListening(); else startListening((text) => setInput(text)); }}
                     className="transition-colors" style={{ color: listening ? "#3b82f6" : "var(--fg-muted)" }}
@@ -444,9 +428,7 @@ function ChatPage() {
             </div>
 
             {isGenerating || generatingImage ? (
-              <Button variant="destructive" size="icon"
-                onClick={imageMode ? () => setGeneratingImage(false) : handleStop}
-                className="rounded-2xl shrink-0">
+              <Button variant="destructive" size="icon" onClick={handleStop} className="rounded-2xl shrink-0">
                 {generatingImage ? <Spinner size={16} /> : <Square className="w-4 h-4" />}
               </Button>
             ) : (
