@@ -1,7 +1,6 @@
 "use client";
 
-
-import { useState, useRef, useCallback, Suspense } from "react";
+import { useState, useRef, useCallback, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -16,6 +15,8 @@ import {
   MicOff,
   ImageIcon,
   MessageSquare,
+  Volume2,
+  ChevronDown,
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import type { Message } from "@/types";
@@ -33,6 +34,19 @@ export default function ChatPageWrapper() {
       <ChatPage />
     </Suspense>
   );
+}
+
+// Read file contents for text files
+async function readFileContent(file: File): Promise<string | null> {
+  const textTypes = ["text/", "application/json", "application/xml", "application/javascript", "application/typescript"];
+  const textExtensions = [".txt", ".md", ".json", ".xml", ".js", ".ts", ".tsx", ".jsx", ".py", ".java", ".c", ".cpp", ".html", ".css", ".scss", ".yml", ".yaml", ".sh", ".sql", ".csv", ".env", ".gitignore"];
+
+  const isText = textTypes.some((t) => file.type.startsWith(t)) || textExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
+
+  if (isText && file.size < 100000) {
+    return await file.text();
+  }
+  return null;
 }
 
 function ChatPage() {
@@ -58,6 +72,9 @@ function ChatPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [imageMode, setImageMode] = useState(false);
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState(0);
+  const [showVoicePicker, setShowVoicePicker] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const { listening, supported: voiceSupported, start: startListening, stop: stopListening } = useVoiceInput();
   const messagesEndRef = useAutoScroll<HTMLDivElement>([conversations]);
@@ -65,6 +82,18 @@ function ChatPage() {
   const activeConv = conversations.find(
     (c) => c.id === (conversationId || activeConversationId)
   );
+
+  // Load TTS voices
+  useEffect(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      const loadVoices = () => {
+        const v = window.speechSynthesis.getVoices();
+        if (v.length > 0) setAvailableVoices(v);
+      };
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -79,7 +108,6 @@ function ChatPage() {
       convId = createConversation("hemix-1");
     }
 
-    // User message showing the prompt
     const userMessage: Message = {
       id: nanoid(),
       role: "user",
@@ -91,7 +119,6 @@ function ChatPage() {
     setInput("");
     setGeneratingImage(true);
 
-    // Placeholder assistant message
     const imgMessage: Message = {
       id: nanoid(),
       role: "assistant",
@@ -120,15 +147,14 @@ function ChatPage() {
       });
     } catch {
       updateMessage(convId!, imgMessage.id, {
-        content: "Sorry, I couldn\'t generate that image. Please try again.",
+        content: "Sorry, I couldn't generate that image. Please try again.",
         status: "error",
         type: "text",
       });
     } finally {
       setGeneratingImage(false);
     }
-  }, [input, generatingImage, activeConv, activeConversationId, createConversation, addMessage, updateMessage]);
-
+  }, [generatingImage, activeConv, activeConversationId, createConversation, addMessage, updateMessage]);
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || isGenerating) return;
@@ -141,6 +167,15 @@ function ChatPage() {
     let convId = activeConversationId;
     if (!activeConv) {
       convId = createConversation("hemix-1");
+    }
+
+    // Read file contents
+    let fileContents: string[] = [];
+    for (const file of attachments) {
+      const content = await readFileContent(file);
+      if (content) {
+        fileContents.push(`[File: ${file.name}]\n${content}`);
+      }
     }
 
     const userMessage: Message = {
@@ -157,6 +192,7 @@ function ChatPage() {
     };
 
     addMessage(convId!, userMessage);
+    const currentInput = input.trim();
     setInput("");
     setAttachments([]);
 
@@ -172,6 +208,11 @@ function ChatPage() {
     setGenerating(true);
     abortRef.current = new AbortController();
 
+    // Build message content — include file contents
+    const userContent = fileContents.length > 0
+      ? `${currentInput}\n\n${fileContents.join("\n\n")}`
+      : currentInput;
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -180,15 +221,15 @@ function ChatPage() {
         body: JSON.stringify({
           model: activeConv?.model || "hemix-1",
           messages: [
-            { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. You are Hemix AI, your own assistant. Keep answers short by default — a few sentences or a brief list. Only give a long detailed answer when the user explicitly asks for more detail, a full explanation, or a guide." },
+            { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. You are Hemix AI, your own assistant. Keep answers short by default — a few sentences or a brief list. Only give a long, detailed, or step-by-step answer when the user explicitly asks for more detail, a full explanation, or a guide." },
             ...(activeConv?.messages || []).map((m) => ({
               role: m.role,
               content: m.content,
             })),
-            { role: "user", content: input.trim() },
+            { role: "user", content: userContent },
           ],
           temperature: chatSettings.temperature ?? 0.7,
-          maxTokens: chatSettings.maxTokens ?? 8192,
+          maxTokens: chatSettings.maxTokens ?? 16384,
           topP: chatSettings.topP ?? 1,
         }),
       });
@@ -296,7 +337,7 @@ function ChatPage() {
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Welcome to Hemix AI</h2>
             <p className="text-muted mb-6 text-sm sm:text-base">
-              Ask anything, upload files, and get instant streaming responses.
+              Ask anything, upload files, generate images, and get instant streaming responses.
             </p>
 
             <Button
@@ -348,6 +389,54 @@ function ChatPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {/* Voice selector */}
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowVoicePicker(!showVoicePicker)}
+              title="Select voice"
+              className="hidden sm:flex"
+            >
+              <Volume2 className="w-4 h-4" />
+            </Button>
+            <AnimatePresence>
+              {showVoicePicker && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  className="absolute right-0 top-full mt-2 z-50 w-64 max-h-64 overflow-y-auto rounded-xl border shadow-2xl"
+                  style={{ background: "var(--input-bg)", borderColor: "var(--input-border)" }}
+                >
+                  <p className="px-3 py-2 text-xs border-b" style={{ color: "var(--fg-muted)", borderColor: "var(--input-border)" }}>
+                    Select Voice ({availableVoices.length} available)
+                  </p>
+                  {availableVoices.slice(0, 20).map((voice, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setSelectedVoice(i);
+                        setShowVoicePicker(false);
+                        // Test the voice
+                        const u = new SpeechSynthesisUtterance("Hello, I am Hemix AI.");
+                        u.voice = voice;
+                        window.speechSynthesis.cancel();
+                        window.speechSynthesis.speak(u);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors ${selectedVoice === i ? "text-primary font-medium" : ""}`}
+                      style={selectedVoice === i ? {} : { color: "var(--fg)" }}
+                    >
+                      {voice.name} <span style={{ color: "var(--fg-muted)" }}>({voice.lang})</span>
+                    </button>
+                  ))}
+                  {availableVoices.length === 0 && (
+                    <p className="px-3 py-4 text-xs" style={{ color: "var(--fg-muted)" }}>No voices available</p>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           <Button variant="ghost" size="icon" onClick={() => setShowSearch(!showSearch)} title="Search" className="hidden sm:flex">
             <Search className="w-4 h-4" />
           </Button>
@@ -385,8 +474,7 @@ function ChatPage() {
       <div
         className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 min-h-0 relative"
         style={{
-          backgroundImage:
-            "radial-gradient(rgba(139,92,246,0.06) 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(rgba(139,92,246,0.06) 1px, transparent 1px)",
           backgroundSize: "22px 22px",
         }}
       >
@@ -401,6 +489,7 @@ function ChatPage() {
               onEdit={(newContent) => {
                 updateMessage(activeConv.id, msg.id, { content: newContent, edited: true });
               }}
+              selectedVoice={selectedVoice}
             />
           ))}
           <div ref={messagesEndRef} />
@@ -494,7 +583,7 @@ function ChatPage() {
 
             {isGenerating || generatingImage ? (
               <Button variant="destructive" size="icon" onClick={imageMode ? () => setGeneratingImage(false) : handleStop} className="rounded-2xl shrink-0">
-                <Square className="w-4 h-4" />
+                {generatingImage ? <Spinner size={16} /> : <Square className="w-4 h-4" />}
               </Button>
             ) : (
               <Button

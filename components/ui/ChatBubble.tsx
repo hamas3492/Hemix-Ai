@@ -1,15 +1,32 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Copy, Check, RotateCcw, Trash2, Pencil } from "lucide-react";
+import { Copy, Check, RotateCcw, Trash2, Pencil, Volume2, Pause, Download } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import type { Message } from "@/types";
-import { copyToClipboard } from "@/lib/utils";
+import { copyToClipboard, downloadFile } from "@/lib/utils";
 import { TypingIndicator } from "@/components/ui/Spinner";
 import { useState, useRef, useEffect } from "react";
+
+// Language to file extension mapping
+const LANG_EXTENSIONS: Record<string, string> = {
+  javascript: "js", js: "js", jsx: "jsx",
+  typescript: "ts", ts: "ts", tsx: "tsx",
+  python: "py", py: "py",
+  java: "java", kotlin: "kt",
+  swift: "swift", c: "c", cpp: "cpp", "c++": "cpp",
+  csharp: "cs", "c#": "cs", cs: "cs",
+  go: "go", rust: "rs", php: "php",
+  ruby: "rb", r: "r", sql: "sql",
+  html: "html", css: "css", scss: "scss",
+  json: "json", yaml: "yml", yml: "yml",
+  xml: "xml", markdown: "md", md: "md",
+  bash: "sh", shell: "sh", sh: "sh",
+  dockerfile: "dockerfile",
+};
 
 interface ChatBubbleProps {
   message: Message;
@@ -17,12 +34,15 @@ interface ChatBubbleProps {
   onDelete?: () => void;
   onEdit?: (newContent: string) => void;
   isLast?: boolean;
+  selectedVoice?: number;
 }
 
-export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast }: ChatBubbleProps) {
+export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, selectedVoice = 0 }: ChatBubbleProps) {
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
+  const [speaking, setSpeaking] = useState(false);
   const isUser = message.role === "user";
   const editRef = useRef<HTMLTextAreaElement>(null);
 
@@ -33,16 +53,65 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast }: 
     }
   }, [editing]);
 
+  // Stop speaking when component unmounts
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
   const handleCopy = (text: string) => {
     copyToClipboard(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCodeCopied(true);
+    setTimeout(() => { setCopied(false); setCodeCopied(false); }, 2000);
   };
 
   const handleSaveEdit = () => {
     onEdit?.(editContent);
     setEditing(false);
   };
+
+  const handleSpeak = () => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+
+    // Strip markdown for cleaner speech
+    const text = message.content
+      .replace(/```[\s\S]*?```/g, " code block ")
+      .replace(/[*#`_>|]/g, "")
+      .replace(/\[(.*?)\]\(.*?\)/g, "$1")
+      .trim();
+
+    if (!text) return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    const allVoices = window.speechSynthesis.getVoices();
+    if (allVoices.length > selectedVoice) {
+      utterance.voice = allVoices[selectedVoice];
+    }
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    setSpeaking(true);
+  };
+
+  const handleDownloadCode = (code: string, lang: string) => {
+    const ext = LANG_EXTENSIONS[lang?.toLowerCase()] || "txt";
+    downloadFile(code, `hemix-${Date.now()}.${ext}`, "text/plain");
+  };
+
+  const isImageMessage = message.type === "image" && message.imageUrl;
 
   return (
     <motion.div
@@ -89,6 +158,33 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast }: 
               </button>
             </div>
           </div>
+        ) : isImageMessage ? (
+          /* Image message rendering */
+          <div className="py-1">
+            {message.imagePrompt && (
+              <p className="text-xs mb-2" style={{ color: "var(--fg-muted)" }}>
+                {message.imagePrompt}
+              </p>
+            )}
+            <div className="relative rounded-xl overflow-hidden inline-block max-w-md">
+              <img
+                src={message.imageUrl}
+                alt={message.imagePrompt || "Generated image"}
+                className="rounded-xl max-w-full"
+                loading="lazy"
+              />
+              <a
+                href={message.imageUrl}
+                download="hemix-image.png"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="absolute top-2 right-2 p-2 rounded-lg bg-black/60 hover:bg-black/80 text-white transition-colors"
+                title="Download image"
+              >
+                <Download className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
         ) : message.status === "streaming" && !message.content ? (
           <div className="py-2">
             <TypingIndicator />
@@ -129,14 +225,24 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast }: 
                               <span className="text-xs" style={{ color: "var(--fg-muted)" }}>
                                 {match[1]}
                               </span>
-                              <button
-                                onClick={() => handleCopy(code)}
-                                className="text-xs flex items-center gap-1 transition-colors"
-                                style={{ color: "var(--fg-muted)" }}
-                              >
-                                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                {copied ? "Copied" : "Copy"}
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleDownloadCode(code, match[1])}
+                                  className="text-xs flex items-center gap-1 transition-colors hover:text-white"
+                                  style={{ color: "var(--fg-muted)" }}
+                                  title="Download code"
+                                >
+                                  <Download className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => handleCopy(code)}
+                                  className="text-xs flex items-center gap-1 transition-colors"
+                                  style={{ color: "var(--fg-muted)" }}
+                                >
+                                  {codeCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                  {codeCopied ? "Copied" : "Copy"}
+                                </button>
+                              </div>
                             </div>
                             <SyntaxHighlighter
                               style={vscDarkPlus}
@@ -183,6 +289,17 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast }: 
                 >
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
+                {/* TTS Speaker button — only for AI messages */}
+                {!isUser && typeof window !== "undefined" && "speechSynthesis" in window && (
+                  <button
+                    onClick={handleSpeak}
+                    className={`p-1.5 rounded-md hover:bg-white/5 transition-colors ${speaking ? "text-primary" : ""}`}
+                    style={speaking ? {} : { color: "var(--fg-muted)" }}
+                    title={speaking ? "Stop" : "Read aloud"}
+                  >
+                    {speaking ? <Pause className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </button>
+                )}
                 {isUser && onEdit && (
                   <button
                     onClick={() => setEditing(true)}
