@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
-import type { Conversation, Message, ChatSettings, AppSettings, User } from "@/types";
+import type { Conversation, Message, ChatSettings, AppSettings, User, PersonalityId } from "@/types";
+import { PERSONALITIES } from "@/types";
 import type { SubscriptionRecord } from "@/services/payment-service";
 
 interface ChatStore {
@@ -13,7 +14,6 @@ interface ChatStore {
   appSettings: AppSettings;
   user: User | null;
 
-  // Subscription & Usage limits state
   subscription: SubscriptionRecord | null;
   dailyMessageCount: number;
   lastMessageDate: string;
@@ -23,6 +23,7 @@ interface ChatStore {
   renameConversation: (id: string, title: string) => void;
   pinConversation: (id: string) => void;
   updateConversationModel: (id: string, model: string) => void;
+  updateConversationPersonality: (id: string, personality: PersonalityId) => void;
   setActiveConversation: (id: string) => void;
   addMessage: (conversationId: string, message: Message) => void;
   updateMessage: (conversationId: string, messageId: string, updates: Partial<Message>) => void;
@@ -34,7 +35,6 @@ interface ChatStore {
   setUser: (user: User | null) => void;
   exportConversation: (id: string) => string;
 
-  // New Subscription & Usage methods
   incrementMessageCount: () => void;
   setSubscription: (subscription: SubscriptionRecord | null) => void;
   resetDailyCount: () => void;
@@ -44,7 +44,7 @@ const defaultChatSettings: ChatSettings = {
   temperature: 0.7,
   maxTokens: 16384,
   topP: 1,
-  systemPrompt: "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. You are Hemix AI, your own assistant. Keep answers short by default — a few sentences or a brief list. Only give a long detailed answer when the user explicitly asks for more detail, a full explanation, or a guide.",
+  systemPrompt: "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. You are Hemix AI, your own assistant. Keep answers short by default — a few sentences or a brief list. Only give a long detailed answer when the user explicitly asks for more detail, a full explanation, or a guide. When generating code, ALWAYS complete the full code.",
   streamResponse: true,
 };
 
@@ -129,9 +129,15 @@ export const useChatStore = create<ChatStore>()(
         }));
       },
 
-      setActiveConversation: (id: string) => {
-        set({ activeConversationId: id });
+      updateConversationPersonality: (id: string, personality: PersonalityId) => {
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === id ? { ...c, personality, updatedAt: new Date().toISOString() } : c
+          ),
+        }));
       },
+
+      setActiveConversation: (id: string) => set({ activeConversationId: id }),
 
       addMessage: (conversationId: string, message: Message) => {
         set((state) => ({
@@ -225,7 +231,7 @@ export const useChatStore = create<ChatStore>()(
     }),
     {
       name: "hemix-storage",
-      version: 2,
+      version: 3,
       migrate: (persisted: any, version: number) => {
         if (version < 2 && persisted?.chatSettings) {
           persisted.chatSettings.systemPrompt = undefined;
@@ -235,3 +241,12 @@ export const useChatStore = create<ChatStore>()(
     }
   )
 );
+
+// Helper: get system prompt with personality
+export function getSystemPrompt(chatSettings: ChatSettings, personality?: PersonalityId): string {
+  const basePrompt = "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. You are Hemix AI, your own assistant. Keep answers short by default — a few sentences or a brief list. Only give a long detailed answer when the user explicitly asks for more detail, a full explanation, or a guide. When generating code, ALWAYS complete the full code.";
+  if (personality && PERSONALITIES[personality]) {
+    return `${basePrompt}\n\n${PERSONALITIES[personality].prompt}`;
+  }
+  return chatSettings.systemPrompt || basePrompt;
+}

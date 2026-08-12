@@ -25,6 +25,12 @@ export interface Message {
   type?: "text" | "image" | "file";
   imageUrl?: string;
   imagePrompt?: string;
+  // New: message feedback
+  liked?: boolean;
+  disliked?: boolean;
+  shared?: boolean;
+  // New: voice transcript
+  voiceTranscript?: boolean;
 }
 
 export interface FileAttachment {
@@ -44,7 +50,11 @@ export interface Conversation {
   updatedAt: string;
   pinned: boolean;
   systemPrompt?: string;
+  // New: personality setting
+  personality?: PersonalityId;
 }
+
+export type PersonalityId = "friendly" | "professional" | "teacher" | "coding" | "creative" | "casual" | "concise";
 
 export interface User {
   id: string;
@@ -104,3 +114,42 @@ export interface Feature {
   title: string;
   description: string;
 }
+
+// Personality definitions
+export const PERSONALITIES: Record<PersonalityId, { name: string; description: string; prompt: string }> = {
+  friendly: {
+    name: "Friendly",
+    description: "Warm, casual, and approachable",
+    prompt: "Be warm, friendly, and conversational. Use a casual tone as if talking to a good friend.",
+  },
+  professional: {
+    name: "Professional",
+    description: "Formal, precise, and business-like",
+    prompt: "Be professional, precise, and formal. Use clear business language.",
+  },
+  teacher: {
+    name: "Teacher",
+    description: "Patient, educational, step-by-step",
+    prompt: "Be like a patient teacher. Explain concepts step by step. Use examples and analogies.",
+  },
+  coding: {
+    name: "Coding Expert",
+    description: "Technical, detailed, code-focused",
+    prompt: "Be a coding expert. Provide detailed technical answers with well-commented code. Always complete code blocks fully.",
+  },
+  creative: {
+    name: "Creative",
+    description: "Imaginative, expressive, and playful",
+    prompt: "Be creative and imaginative. Use vivid language and creative examples.",
+  },
+  casual: {
+    name: "Casual",
+    description: "Relaxed, brief, and to the point",
+    prompt: "Be casual and relaxed. Keep responses brief and to the point.",
+  },
+  concise: {
+    name: "Concise",
+    description: "Minimal words, maximum information",
+    prompt: "Be extremely concise. Give the shortest useful answer possible. Skip pleasantries.",
+  },
+};

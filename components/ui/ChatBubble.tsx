@@ -1,17 +1,21 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Copy, Check, RotateCcw, Trash2, Pencil, Volume2, Pause, Download } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Copy, Check, RotateCcw, Trash2, Pencil, Volume2, Pause, Download,
+  ThumbsUp, ThumbsDown, Share2, MoreHorizontal, Maximize2, Wand2,
+  Image as ImageIcon, AlertCircle, RefreshCw,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import type { Message } from "@/types";
-import { copyToClipboard, downloadFile } from "@/lib/utils";
+import { copyToClipboard, downloadFile, cn } from "@/lib/utils";
 import { TypingIndicator } from "@/components/ui/Spinner";
 import { useState, useRef, useEffect } from "react";
 
-const LANG_EXTENSIONS: Record<string, string> = {
+const LANG_EXT: Record<string, string> = {
   javascript: "js", js: "js", jsx: "jsx", typescript: "ts", ts: "ts", tsx: "tsx",
   python: "py", py: "py", java: "java", kotlin: "kt", swift: "swift",
   c: "c", cpp: "cpp", "c++": "cpp", csharp: "cs", "c#": "cs", cs: "cs",
@@ -26,18 +30,32 @@ interface ChatBubbleProps {
   onRegenerate?: () => void;
   onDelete?: () => void;
   onEdit?: (newContent: string) => void;
+  onLike?: () => void;
+  onDislike?: () => void;
+  onShare?: () => void;
+  onImageClick?: (url: string) => void;
+  onImageRetry?: () => void;
+  onImageVariation?: () => void;
+  onImageEdit?: () => void;
   isLast?: boolean;
   selectedVoice?: number;
+  onSpeak?: (text: string) => void;
+  isSpeaking?: boolean;
 }
 
-export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, selectedVoice = 0 }: ChatBubbleProps) {
+export function ChatBubble({
+  message, onRegenerate, onDelete, onEdit, onLike, onDislike, onShare,
+  onImageClick, onImageRetry, onImageVariation, onImageEdit,
+  isLast, selectedVoice = 0, onSpeak, isSpeaking,
+}: ChatBubbleProps) {
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
-  const [speaking, setSpeaking] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const isUser = message.role === "user";
   const editRef = useRef<HTMLTextAreaElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (editing && editRef.current) {
@@ -47,7 +65,11 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, se
   }, [editing]);
 
   useEffect(() => {
-    return () => { if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel(); };
+    const handler = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setShowMore(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   const handleCopy = (text: string) => {
@@ -59,39 +81,91 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, se
   const handleSaveEdit = () => { onEdit?.(editContent); setEditing(false); };
 
   const handleSpeak = () => {
+    if (onSpeak) { onSpeak(message.content); return; }
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    if (speaking) { window.speechSynthesis.cancel(); setSpeaking(false); return; }
-    const text = message.content
-      .replace(/```[\s\S]*?```/g, " code block ")
-      .replace(/[*#`_>|]/g, "")
-      .replace(/\[(.*?)\]\(.*?\)/g, "$1")
-      .trim();
+    if (isSpeaking) { window.speechSynthesis.cancel(); return; }
+    const text = message.content.replace(/```[\s\S]*?```/g, " code block ").replace(/[*#`_>|]/g, "").trim();
     if (!text) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    const allVoices = window.speechSynthesis.getVoices();
-    if (allVoices.length > selectedVoice) utterance.voice = allVoices[selectedVoice];
-    utterance.rate = 1; utterance.pitch = 1;
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
+    const u = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > selectedVoice) u.voice = voices[selectedVoice];
+    u.onend = () => {}; u.onerror = () => {};
     window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-    setSpeaking(true);
+    window.speechSynthesis.speak(u);
   };
 
   const handleDownloadCode = (code: string, lang: string) => {
-    const ext = LANG_EXTENSIONS[lang?.toLowerCase()] || "txt";
+    const ext = LANG_EXT[lang?.toLowerCase()] || "txt";
     downloadFile(code, `hemix-${Date.now()}.${ext}`, "text/plain");
   };
 
   const isImageMessage = message.type === "image" && message.imageUrl;
   const isGeneratingImage = message.type === "image" && message.status === "streaming" && !message.imageUrl;
+  const isImageError = message.type === "image" && message.status === "error";
+
+  // === ACTION BUTTON COMPONENT ===
+  const ActionBtn = ({ icon: Icon, label, onClick, active }: any) => (
+    <button
+      onClick={onClick}
+      className={cn("p-1.5 rounded-md hover:bg-white/5 transition-colors touch-target no-select",
+        active ? "text-primary" : "")}
+      style={!active ? { color: "var(--fg-muted)" } : {}}
+      aria-label={label}
+      title={label}
+    >
+      <Icon className="w-3.5 h-3.5" />
+    </button>
+  );
+
+  // === IMAGE ACTIONS ===
+  const ImageActions = () => (
+    <div className="flex items-center gap-0.5 mt-2 flex-wrap">
+      <button onClick={() => onImageClick?.(message.imageUrl!)}
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs hover:bg-white/5 transition-colors touch-target"
+        style={{ color: "var(--fg-muted)" }} aria-label="Open fullscreen">
+        <Maximize2 className="w-3.5 h-3.5" /> Open
+      </button>
+      <a href={message.imageUrl} download="hemix-image.png" target="_blank" rel="noopener noreferrer"
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs hover:bg-white/5 transition-colors touch-target"
+        style={{ color: "var(--fg-muted)" }} aria-label="Download image">
+        <Download className="w-3.5 h-3.5" /> Download
+      </a>
+      <button onClick={() => copyToClipboard(message.imageUrl!)}
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs hover:bg-white/5 transition-colors touch-target"
+        style={{ color: "var(--fg-muted)" }} aria-label="Copy image URL">
+        <Copy className="w-3.5 h-3.5" /> Copy
+      </button>
+      {onImageVariation && (
+        <button onClick={onImageVariation}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs hover:bg-white/5 transition-colors touch-target"
+          style={{ color: "var(--fg-muted)" }} aria-label="Generate variation">
+          <ImageIcon className="w-3.5 h-3.5" /> Variation
+        </button>
+      )}
+      {onImageEdit && (
+        <button onClick={onImageEdit}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs hover:bg-white/5 transition-colors touch-target"
+          style={{ color: "var(--fg-muted)" }} aria-label="Edit image">
+          <Wand2 className="w-3.5 h-3.5" /> Edit
+        </button>
+      )}
+      {onShare && (
+        <button onClick={onShare}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs hover:bg-white/5 transition-colors touch-target"
+          style={{ color: "var(--fg-muted)" }} aria-label="Share image">
+          <Share2 className="w-3.5 h-3.5" /> Share
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}
-      className={`group ${isUser ? "flex justify-end" : "w-full"}`}
+      className={cn("group", isUser ? "flex justify-end" : "w-full")}
     >
-      <div className={`${isUser ? "max-w-[80%] sm:max-w-[75%]" : "w-full"}`}>
+      <div className={cn(isUser ? "max-w-[80%] sm:max-w-[75%]" : "w-full")}>
+        {/* === EDITING MODE === */}
         {editing ? (
           <div className="space-y-2">
             <textarea ref={editRef} value={editContent} onChange={(e) => setEditContent(e.target.value)}
@@ -105,80 +179,53 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, se
             </div>
           </div>
         ) : isGeneratingImage ? (
-          /* === IMAGE LOADING BUBBLE — picture-sized with Generating picture... === */
+          /* === IMAGE GENERATING STATE — animated skeleton === */
           <div className="w-full max-w-sm">
-            <div
-              className="relative rounded-2xl overflow-hidden flex items-center justify-center"
-              style={{
-                width: "100%",
-                aspectRatio: "1 / 1",
-                background: "var(--input-bg)",
-                border: "1px solid var(--input-border)",
-              }}
-            >
-              {/* Animated gradient background */}
-              <div
-                className="absolute inset-0 opacity-30 animate-pulse"
-                style={{
-                  background: "linear-gradient(135deg, var(--primary, #3b82f6) 0%, var(--secondary, #8b5cf6) 100%)",
-                }}
-              />
-              {/* Center content */}
-              <div className="relative z-10 flex flex-col items-center gap-3">
-                {/* Spinner */}
-                <div
-                  className="w-10 h-10 rounded-full border-3 border-transparent animate-spin"
-                  style={{
-                    borderTopColor: "var(--primary, #3b82f6)",
-                    borderBottomColor: "var(--primary, #3b82f6)",
-                  }}
-                />
-                <p className="text-sm font-medium" style={{ color: "var(--fg)" }}>
-                  Generating picture...
-                </p>
+            <div className="relative rounded-2xl overflow-hidden skeleton-image"
+              style={{ width: "100%", aspectRatio: "1 / 1", border: "1px solid var(--input-border)" }}>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10">
+                <RefreshCw className="w-8 h-8 animate-spin" style={{ color: "var(--primary, #3b82f6)" }} />
+                <p className="text-sm font-medium" style={{ color: "var(--fg)" }}>Generating picture...</p>
                 {message.imagePrompt && (
-                  <p className="text-xs text-center px-4 line-clamp-2" style={{ color: "var(--fg-muted)" }}>
-                    {message.imagePrompt}
-                  </p>
+                  <p className="text-xs text-center px-6 line-clamp-2" style={{ color: "var(--fg-muted)" }}>{message.imagePrompt}</p>
                 )}
               </div>
             </div>
           </div>
-        ) : isImageMessage ? (
-          /* === IMAGE REVEAL — generated image with fade-in === */
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-            className="py-1"
-          >
-            {message.imagePrompt && (
-              <p className="text-xs mb-2" style={{ color: "var(--fg-muted)" }}>
-                {message.imagePrompt}
-              </p>
-            )}
-            <div className="relative rounded-xl overflow-hidden inline-block max-w-md">
-              <img
-                src={message.imageUrl}
-                alt={message.imagePrompt || "Generated image"}
-                className="rounded-xl max-w-full"
-                loading="lazy"
-              />
-              <a
-                href={message.imageUrl}
-                download="hemix-image.png"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="absolute top-2 right-2 p-2 rounded-lg bg-black/60 hover:bg-black/80 text-white transition-colors"
-                title="Download image"
-              >
-                <Download className="w-4 h-4" />
-              </a>
+        ) : isImageError ? (
+          /* === IMAGE FAILED STATE === */
+          <div className="w-full max-w-sm">
+            <div className="rounded-2xl p-6 flex flex-col items-center gap-3"
+              style={{ border: "1px solid var(--input-border)", background: "var(--input-bg)" }}>
+              <AlertCircle className="w-8 h-8 text-red-400" />
+              <p className="text-sm" style={{ color: "var(--fg)" }}>Image generation failed. Try again.</p>
+              {onImageRetry && (
+                <button onClick={onImageRetry}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-xs font-medium hover:opacity-90 transition-opacity touch-target">
+                  <RotateCcw className="w-3.5 h-3.5" /> Retry
+                </button>
+              )}
             </div>
+          </div>
+        ) : isImageMessage ? (
+          /* === IMAGE COMPLETE — reveal with actions === */
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }} className="py-1">
+            {message.imagePrompt && (
+              <p className="text-xs mb-2" style={{ color: "var(--fg-muted)" }}>{message.imagePrompt}</p>
+            )}
+            <div className="relative rounded-xl overflow-hidden inline-block max-w-md group/img cursor-pointer"
+              onClick={() => onImageClick?.(message.imageUrl!)}>
+              <img src={message.imageUrl} alt={message.imagePrompt || "Generated image"} className="rounded-xl max-w-full" loading="lazy" />
+              <div className="absolute top-2 right-2 p-2 rounded-lg bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Maximize2 className="w-4 h-4 text-white" />
+              </div>
+            </div>
+            <ImageActions />
           </motion.div>
         ) : message.status === "streaming" && !message.content ? (
           <div className="py-2"><TypingIndicator /></div>
         ) : (
+          /* === TEXT MESSAGE === */}
           <>
             {isUser ? (
               <div className="rounded-2xl px-4 py-2.5 text-sm"
@@ -187,85 +234,101 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, se
               </div>
             ) : (
               <div className="markdown-body py-1">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    code({ node, className, children, ...props }: any) {
-                      const match = /language-(\w+)/.exec(className || "");
-                      const code = String(children).replace(/\n$/, "");
-                      if (match) {
-                        return (
-                          <div className="relative group/code my-3">
-                            <div className="flex items-center justify-between px-4 py-2 rounded-t-lg border-b"
-                              style={{ background: "var(--input-bg)", borderColor: "var(--input-border)" }}>
-                              <span className="text-xs" style={{ color: "var(--fg-muted)" }}>{match[1]}</span>
-                              <div className="flex items-center gap-2">
-                                <button onClick={() => handleDownloadCode(code, match[1])}
-                                  className="text-xs flex items-center gap-1 transition-colors hover:text-white"
-                                  style={{ color: "var(--fg-muted)" }} title="Download code">
-                                  <Download className="w-3 h-3" />
-                                </button>
-                                <button onClick={() => handleCopy(code)}
-                                  className="text-xs flex items-center gap-1 transition-colors"
-                                  style={{ color: "var(--fg-muted)" }}>
-                                  {codeCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                  {codeCopied ? "Copied" : "Copy"}
-                                </button>
-                              </div>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                  code({ node, className, children, ...props }: any) {
+                    const match = /language-(\w+)/.exec(className || "");
+                    const code = String(children).replace(/\n$/, "");
+                    if (match) {
+                      return (
+                        <div className="relative group/code my-3">
+                          <div className="flex items-center justify-between px-4 py-2 rounded-t-lg border-b"
+                            style={{ background: "var(--input-bg)", borderColor: "var(--input-border)" }}>
+                            <span className="text-xs" style={{ color: "var(--fg-muted)" }}>{match[1]}</span>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => handleDownloadCode(code, match[1])}
+                                className="text-xs flex items-center gap-1 hover:text-white transition-colors" style={{ color: "var(--fg-muted)" }} title="Download">
+                                <Download className="w-3 h-3" />
+                              </button>
+                              <button onClick={() => handleCopy(code)}
+                                className="text-xs flex items-center gap-1 transition-colors" style={{ color: "var(--fg-muted)" }}>
+                                {codeCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                {codeCopied ? "Copied" : "Copy"}
+                              </button>
                             </div>
-                            <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div"
-                              customStyle={{ margin: 0, borderRadius: "0 0 12px 12px", background: "rgba(0, 0, 0, 0.35)", fontSize: "13px" }}
-                              {...props}>
-                              {code}
-                            </SyntaxHighlighter>
                           </div>
-                        );
-                      }
-                      return <code className={className} {...props}>{children}</code>;
-                    },
-                  }}
-                >
-                  {message.content}
-                </ReactMarkdown>
+                          <SyntaxHighlighter style={vscDarkPlus} language={match[1]} PreTag="div"
+                            customStyle={{ margin: 0, borderRadius: "0 0 12px 12px", background: "rgba(0,0,0,0.35)", fontSize: "13px" }}
+                            {...props}>{code}</SyntaxHighlighter>
+                        </div>
+                      );
+                    }
+                    return <code className={className} {...props}>{children}</code>;
+                  },
+                }}>{message.content}</ReactMarkdown>
               </div>
             )}
 
-            {/* Action buttons — always visible for AI, hover for user */}
+            {/* === MESSAGE ACTIONS === */}
             {!editing && message.status !== "streaming" && (
-              <div className={`flex items-center gap-1 mt-1.5 ${isUser ? "justify-end opacity-0 group-hover:opacity-100" : "justify-start"} transition-opacity`}>
-                <button onClick={() => handleCopy(message.content)}
-                  className="p-1.5 rounded-md hover:bg-white/5 transition-colors"
-                  style={{ color: "var(--fg-muted)" }} title="Copy">
-                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-                {!isUser && typeof window !== "undefined" && "speechSynthesis" in window && (
-                  <button onClick={handleSpeak}
-                    className={`p-1.5 rounded-md hover:bg-white/5 transition-colors ${speaking ? "text-primary" : ""}`}
-                    style={speaking ? {} : { color: "var(--fg-muted)" }}
-                    title={speaking ? "Stop" : "Read aloud"}>
-                    {speaking ? <Pause className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  </button>
+              <div className={cn(
+                "flex items-center gap-0.5 mt-1.5",
+                isUser ? "justify-end opacity-0 group-hover:opacity-100 md:opacity-0" : "justify-start",
+                "transition-opacity"
+              )}>
+                {/* Copy — always visible */}
+                <ActionBtn icon={copied ? Check : Copy} label="Copy" onClick={() => handleCopy(message.content)} />
+
+                {/* AI message actions */}
+                {!isUser && (
+                  <>
+                    {/* Read aloud / Stop */}
+                    <ActionBtn icon={isSpeaking ? Pause : Volume2} label={isSpeaking ? "Stop speaking" : "Read aloud"}
+                      onClick={handleSpeak} active={isSpeaking} />
+                    {/* Like */}
+                    <ActionBtn icon={ThumbsUp} label="Like" onClick={onLike} active={message.liked} />
+                    {/* Dislike */}
+                    <ActionBtn icon={ThumbsDown} label="Dislike" onClick={onDislike} active={message.disliked} />
+                    {/* Regenerate — only on last message */}
+                    {onRegenerate && isLast && <ActionBtn icon={RotateCcw} label="Regenerate" onClick={onRegenerate} />}
+                    {/* Share */}
+                    {onShare && <ActionBtn icon={Share2} label="Share" onClick={onShare} />}
+                    {/* More menu */}
+                    <div ref={moreRef} className="relative">
+                      <ActionBtn icon={MoreHorizontal} label="More" onClick={() => setShowMore(!showMore)} />
+                      <AnimatePresence>
+                        {showMore && (
+                          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
+                            className="absolute right-0 top-full mt-1 z-50 w-40 rounded-xl border shadow-2xl py-1"
+                            style={{ background: "var(--card-bg)", borderColor: "var(--input-border)" }}>
+                            <button onClick={() => { handleCopy(message.content); setShowMore(false); }}
+                              className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 flex items-center gap-2" style={{ color: "var(--fg)" }}>
+                              <Copy className="w-3.5 h-3.5" /> Copy text
+                            </button>
+                            {onShare && (
+                              <button onClick={() => { onShare(); setShowMore(false); }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 flex items-center gap-2" style={{ color: "var(--fg)" }}>
+                                <Share2 className="w-3.5 h-3.5" /> Share
+                              </button>
+                            )}
+                            {onDelete && (
+                              <button onClick={() => { onDelete(); setShowMore(false); }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 flex items-center gap-2 text-red-400">
+                                <Trash2 className="w-3.5 h-3.5" /> Delete
+                              </button>
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </>
                 )}
+
+                {/* User message actions */}
                 {isUser && onEdit && (
-                  <button onClick={() => setEditing(true)}
-                    className="p-1.5 rounded-md hover:bg-white/5 transition-colors"
-                    style={{ color: "var(--fg-muted)" }} title="Edit">
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
+                  <ActionBtn icon={Pencil} label="Edit" onClick={() => setEditing(true)} />
                 )}
-                {!isUser && onRegenerate && isLast && (
-                  <button onClick={onRegenerate}
-                    className="p-1.5 rounded-md hover:bg-white/5 transition-colors"
-                    style={{ color: "var(--fg-muted)" }} title="Regenerate">
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                {onDelete && (
-                  <button onClick={onDelete}
-                    className="p-1.5 rounded-md hover:bg-white/5 hover:text-red-400 transition-colors"
-                    style={{ color: "var(--fg-muted)" }} title="Delete">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                {isUser && onDelete && (
+                  <ActionBtn icon={Trash2} label="Delete" onClick={onDelete} />
                 )}
               </div>
             )}
