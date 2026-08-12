@@ -11,7 +11,6 @@ import { copyToClipboard, downloadFile } from "@/lib/utils";
 import { TypingIndicator } from "@/components/ui/Spinner";
 import { useState, useRef, useEffect } from "react";
 
-// Language to file extension mapping
 const LANG_EXTENSIONS: Record<string, string> = {
   javascript: "js", js: "js", jsx: "jsx",
   typescript: "ts", ts: "ts", tsx: "tsx",
@@ -53,7 +52,6 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, se
     }
   }, [editing]);
 
-  // Stop speaking when component unmounts
   useEffect(() => {
     return () => {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -83,7 +81,6 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, se
       return;
     }
 
-    // Strip markdown for cleaner speech
     const text = message.content
       .replace(/```[\s\S]*?```/g, " code block ")
       .replace(/[*#`_>|]/g, "")
@@ -159,7 +156,6 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, se
             </div>
           </div>
         ) : isImageMessage ? (
-          /* Image message rendering */
           <div className="py-1">
             {message.imagePrompt && (
               <p className="text-xs mb-2" style={{ color: "var(--fg-muted)" }}>
@@ -191,7 +187,6 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, se
           </div>
         ) : (
           <>
-            {/* User message: subtle bubble */}
             {isUser ? (
               <div
                 className="rounded-2xl px-4 py-2.5 text-sm"
@@ -204,7 +199,6 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, se
                 <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
               </div>
             ) : (
-              /* AI message: plain text like ChatGPT */
               <div className="markdown-body py-1">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -274,12 +268,12 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, se
               </div>
             )}
 
-            {/* Action buttons — appear on hover, ChatGPT-style */}
+            {/* Action buttons — always visible for AI, hover for user */}
             {!editing && message.status !== "streaming" && (
               <div
-                className={`flex items-center gap-0.5 mt-1 ${
-                  isUser ? "justify-end" : "justify-start"
-                } opacity-0 group-hover:opacity-100 transition-opacity`}
+                className={`flex items-center gap-1 mt-1.5 ${
+                  isUser ? "justify-end opacity-0 group-hover:opacity-100" : "justify-start"
+                } transition-opacity`}
               >
                 <button
                   onClick={() => handleCopy(message.content)}
@@ -289,7 +283,7 @@ export function ChatBubble({ message, onRegenerate, onDelete, onEdit, isLast, se
                 >
                   {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
-                {/* TTS Speaker button — only for AI messages */}
+                {/* TTS Speaker — always visible for AI messages */}
                 {!isUser && typeof window !== "undefined" && "speechSynthesis" in window && (
                   <button
                     onClick={handleSpeak}

@@ -9,14 +9,11 @@ import {
   Paperclip,
   Download,
   Search,
-  Sparkles,
   X,
   Mic,
   MicOff,
-  ImageIcon,
-  MessageSquare,
+  Image as ImageIcon,
   Volume2,
-  ChevronDown,
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import type { Message } from "@/types";
@@ -36,16 +33,11 @@ export default function ChatPageWrapper() {
   );
 }
 
-// Read file contents for text files
 async function readFileContent(file: File): Promise<string | null> {
   const textTypes = ["text/", "application/json", "application/xml", "application/javascript", "application/typescript"];
   const textExtensions = [".txt", ".md", ".json", ".xml", ".js", ".ts", ".tsx", ".jsx", ".py", ".java", ".c", ".cpp", ".html", ".css", ".scss", ".yml", ".yaml", ".sh", ".sql", ".csv", ".env", ".gitignore"];
-
   const isText = textTypes.some((t) => file.type.startsWith(t)) || textExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
-
-  if (isText && file.size < 100000) {
-    return await file.text();
-  }
+  if (isText && file.size < 100000) return await file.text();
   return null;
 }
 
@@ -83,7 +75,6 @@ function ChatPage() {
     (c) => c.id === (conversationId || activeConversationId)
   );
 
-  // Load TTS voices
   useEffect(() => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       const loadVoices = () => {
@@ -104,29 +95,21 @@ function ChatPage() {
     if (!prompt.trim() || generatingImage) return;
 
     let convId = activeConversationId;
-    if (!activeConv) {
-      convId = createConversation("hemix-1");
-    }
+    if (!activeConv) convId = createConversation("hemix-1");
 
     const userMessage: Message = {
-      id: nanoid(),
-      role: "user",
-      content: `🎨 Generate image: ${prompt.trim()}`,
-      createdAt: new Date().toISOString(),
-      type: "text",
+      id: nanoid(), role: "user",
+      content: prompt.trim(),
+      createdAt: new Date().toISOString(), type: "text",
     };
     addMessage(convId!, userMessage);
     setInput("");
     setGeneratingImage(true);
 
     const imgMessage: Message = {
-      id: nanoid(),
-      role: "assistant",
-      content: "",
-      createdAt: new Date().toISOString(),
-      status: "streaming",
-      type: "image",
-      imagePrompt: prompt.trim(),
+      id: nanoid(), role: "assistant", content: "",
+      createdAt: new Date().toISOString(), status: "streaming",
+      type: "image", imagePrompt: prompt.trim(),
     };
     addMessage(convId!, imgMessage);
 
@@ -136,20 +119,15 @@ function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: prompt.trim() }),
       });
-
       if (!res.ok) throw new Error("Image generation failed");
-
       const data = await res.json();
       updateMessage(convId!, imgMessage.id, {
-        imageUrl: data.url,
-        content: "",
-        status: "complete",
+        imageUrl: data.url, content: "", status: "complete",
       });
     } catch {
       updateMessage(convId!, imgMessage.id, {
         content: "Sorry, I couldn't generate that image. Please try again.",
-        status: "error",
-        type: "text",
+        status: "error", type: "text",
       });
     } finally {
       setGeneratingImage(false);
@@ -161,57 +139,37 @@ function ChatPage() {
 
     if (imageMode) {
       handleImageGenerate(input);
+      setImageMode(false);
       return;
     }
 
     let convId = activeConversationId;
-    if (!activeConv) {
-      convId = createConversation("hemix-1");
-    }
+    if (!activeConv) convId = createConversation("hemix-1");
 
-    // Read file contents
     let fileContents: string[] = [];
     for (const file of attachments) {
       const content = await readFileContent(file);
-      if (content) {
-        fileContents.push(`[File: ${file.name}]\n${content}`);
-      }
+      if (content) fileContents.push(`[File: ${file.name}]\n${content}`);
     }
 
     const userMessage: Message = {
-      id: nanoid(),
-      role: "user",
-      content: input.trim(),
+      id: nanoid(), role: "user", content: input.trim(),
       createdAt: new Date().toISOString(),
-      attachments: attachments.map((f) => ({
-        id: nanoid(),
-        name: f.name,
-        type: f.type,
-        size: f.size,
-      })),
+      attachments: attachments.map((f) => ({ id: nanoid(), name: f.name, type: f.type, size: f.size })),
     };
-
     addMessage(convId!, userMessage);
     const currentInput = input.trim();
-    setInput("");
-    setAttachments([]);
+    setInput(""); setAttachments([]);
 
     const assistantMessage: Message = {
-      id: nanoid(),
-      role: "assistant",
-      content: "",
-      createdAt: new Date().toISOString(),
-      status: "streaming",
+      id: nanoid(), role: "assistant", content: "",
+      createdAt: new Date().toISOString(), status: "streaming",
     };
-
     addMessage(convId!, assistantMessage);
     setGenerating(true);
     abortRef.current = new AbortController();
 
-    // Build message content — include file contents
-    const userContent = fileContents.length > 0
-      ? `${currentInput}\n\n${fileContents.join("\n\n")}`
-      : currentInput;
+    const userContent = fileContents.length > 0 ? `${currentInput}\n\n${fileContents.join("\n\n")}` : currentInput;
 
     try {
       const response = await fetch("/api/chat", {
@@ -221,11 +179,8 @@ function ChatPage() {
         body: JSON.stringify({
           model: activeConv?.model || "hemix-1",
           messages: [
-            { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. You are Hemix AI, your own assistant. Keep answers short by default — a few sentences or a brief list. Only give a long, detailed, or step-by-step answer when the user explicitly asks for more detail, a full explanation, or a guide." },
-            ...(activeConv?.messages || []).map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
+            { role: "system", content: chatSettings.systemPrompt || "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. You are Hemix AI. Keep answers short by default. Only give a long detailed answer when the user explicitly asks for it. When generating code, ALWAYS complete the full code." },
+            ...(activeConv?.messages || []).map((m) => ({ role: m.role, content: m.content })),
             { role: "user", content: userContent },
           ],
           temperature: chatSettings.temperature ?? 0.7,
@@ -234,45 +189,32 @@ function ChatPage() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Request failed (${response.status})`);
-      }
+      if (!response.ok) throw new Error(`Request failed (${response.status})`);
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error("No response stream");
       const decoder = new TextDecoder();
-      let buffer = "";
-      let accumulated = "";
+      let buffer = "", accumulated = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
-
         for (const line of lines) {
           const trimmed = line.trim();
-          if (!trimmed || trimmed === "data: [DONE]") continue;
-          if (!trimmed.startsWith("data: ")) continue;
-
+          if (!trimmed || trimmed === "data: [DONE]" || !trimmed.startsWith("data: ")) continue;
           try {
             const data = JSON.parse(trimmed.slice(6));
             const delta = data.choices?.[0]?.delta?.content;
             if (delta) {
               accumulated += delta;
-              updateMessage(convId!, assistantMessage.id, {
-                content: accumulated,
-                status: "streaming",
-              });
+              updateMessage(convId!, assistantMessage.id, { content: accumulated, status: "streaming" });
             }
-          } catch {
-            continue;
-          }
+          } catch { continue; }
         }
       }
-
       updateMessage(convId!, assistantMessage.id, {
         content: accumulated || "I couldn't generate a response. Please try again.",
         status: "complete",
@@ -290,31 +232,14 @@ function ChatPage() {
       setGenerating(false);
       abortRef.current = null;
     }
-  }, [
-    input,
-    attachments,
-    isGenerating,
-    activeConv,
-    activeConversationId,
-    createConversation,
-    addMessage,
-    updateMessage,
-    setGenerating,
-    chatSettings,
-    imageMode,
-    handleImageGenerate,
-  ]);
+  }, [input, attachments, isGenerating, activeConv, activeConversationId, createConversation, addMessage, updateMessage, setGenerating, chatSettings, imageMode, handleImageGenerate]);
 
-  const handleStop = () => {
-    abortRef.current?.abort();
-    setGenerating(false);
-  };
+  const handleStop = () => { abortRef.current?.abort(); setGenerating(false); };
 
   const handleRegenerate = useCallback(async () => {
     if (!activeConv || activeConv.messages.length < 2) return;
     const lastUserMsg = [...activeConv.messages].reverse().find((m) => m.role === "user");
     if (!lastUserMsg) return;
-
     deleteMessage(activeConv.id, activeConv.messages[activeConv.messages.length - 1].id);
     setInput(lastUserMsg.content);
     setTimeout(() => handleSend(), 100);
@@ -337,34 +262,24 @@ function ChatPage() {
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Welcome to Hemix AI</h2>
             <p className="text-muted mb-6 text-sm sm:text-base">
-              Ask anything, upload files, generate images, and get instant streaming responses.
+              Ask anything, generate images, or talk — all in one chat.
             </p>
-
-            <Button
-              variant="primary"
-              size="lg"
+            <Button variant="primary" size="lg"
               onClick={() => createConversation("hemix-1")}
-              className="bg-gradient-to-r from-primary to-secondary font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-[1.02]"
-            >
+              className="bg-gradient-to-r from-primary to-secondary font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-[1.02]">
               <img src="/assets/icon.png" alt="Hemix AI" className="w-4 h-4 rounded-full object-cover" />
               Start New Chat
             </Button>
-
             <div className="mt-8 sm:mt-12 grid grid-cols-2 gap-3 text-left">
               {[
                 { title: "Write code", desc: "Build a REST API with Express" },
                 { title: "Generate image", desc: "A futuristic city at sunset" },
                 { title: "Get creative", desc: "Write a short story about space" },
-                { title: "Voice chat", desc: "Tap the mic and speak" },
+                { title: "Voice chat", desc: "Tap mic and speak to Hemix" },
               ].map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    createConversation("hemix-1");
-                    setTimeout(() => setInput(s.desc), 200);
-                  }}
-                  className="glass-card p-3 sm:p-4 text-left hover:scale-[1.02] transition-transform"
-                >
+                <button key={i}
+                  onClick={() => { createConversation("hemix-1"); setTimeout(() => setInput(s.desc), 200); }}
+                  className="glass-card p-3 sm:p-4 text-left hover:scale-[1.02] transition-transform">
                   <p className="text-sm font-medium text-white mb-0.5">{s.title}</p>
                   <p className="text-xs text-muted">{s.desc}</p>
                 </button>
@@ -387,46 +302,32 @@ function ChatPage() {
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-sm font-medium truncate" style={{ color: "var(--fg)" }}>{activeConv.title}</span>
         </div>
-
         <div className="flex items-center gap-2 shrink-0">
           {/* Voice selector */}
           <div className="relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowVoicePicker(!showVoicePicker)}
-              title="Select voice"
-              className="hidden sm:flex"
-            >
+            <Button variant="ghost" size="icon" onClick={() => setShowVoicePicker(!showVoicePicker)} title="Select voice" className="hidden sm:flex">
               <Volume2 className="w-4 h-4" />
             </Button>
             <AnimatePresence>
               {showVoicePicker && (
-                <motion.div
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
+                <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
                   className="absolute right-0 top-full mt-2 z-50 w-64 max-h-64 overflow-y-auto rounded-xl border shadow-2xl"
-                  style={{ background: "var(--input-bg)", borderColor: "var(--input-border)" }}
-                >
+                  style={{ background: "var(--input-bg)", borderColor: "var(--input-border)" }}>
                   <p className="px-3 py-2 text-xs border-b" style={{ color: "var(--fg-muted)", borderColor: "var(--input-border)" }}>
                     Select Voice ({availableVoices.length} available)
                   </p>
                   {availableVoices.slice(0, 20).map((voice, i) => (
-                    <button
-                      key={i}
+                    <button key={i}
                       onClick={() => {
                         setSelectedVoice(i);
                         setShowVoicePicker(false);
-                        // Test the voice
                         const u = new SpeechSynthesisUtterance("Hello, I am Hemix AI.");
                         u.voice = voice;
                         window.speechSynthesis.cancel();
                         window.speechSynthesis.speak(u);
                       }}
                       className={`w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors ${selectedVoice === i ? "text-primary font-medium" : ""}`}
-                      style={selectedVoice === i ? {} : { color: "var(--fg)" }}
-                    >
+                      style={selectedVoice === i ? {} : { color: "var(--fg)" }}>
                       {voice.name} <span style={{ color: "var(--fg-muted)" }}>({voice.lang})</span>
                     </button>
                   ))}
@@ -449,67 +350,47 @@ function ChatPage() {
       {/* Search bar */}
       <AnimatePresence>
         {showSearch && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden px-3 sm:px-4 border-b border-white/5"
-          >
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden px-3 sm:px-4 border-b border-white/5">
             <div className="relative py-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-              <input
-                type="text"
-                placeholder="Search in conversation..."
-                value={searchTerm}
+              <input type="text" placeholder="Search in conversation..." value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full h-9 pl-9 pr-3 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-muted/50 focus:outline-none focus:border-primary/50"
-                autoFocus
-              />
+                autoFocus />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Messages */}
-      <div
-        className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 min-h-0 relative"
-        style={{
-          backgroundImage: "radial-gradient(rgba(139,92,246,0.06) 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
-        }}
-      >
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 min-h-0 relative"
+        style={{ backgroundImage: "radial-gradient(rgba(139,92,246,0.06) 1px, transparent 1px)", backgroundSize: "22px 22px" }}>
         <div className="max-w-3xl mx-auto space-y-3.5 sm:space-y-5">
           {filteredMessages.map((msg, i) => (
-            <ChatBubble
-              key={msg.id}
-              message={msg}
-              isLast={i === activeConv.messages.length - 1}
+            <ChatBubble key={msg.id} message={msg} isLast={i === activeConv.messages.length - 1}
               onRegenerate={handleRegenerate}
               onDelete={() => deleteMessage(activeConv.id, msg.id)}
-              onEdit={(newContent) => {
-                updateMessage(activeConv.id, msg.id, { content: newContent, edited: true });
-              }}
-              selectedVoice={selectedVoice}
-            />
+              onEdit={(newContent) => updateMessage(activeConv.id, msg.id, { content: newContent, edited: true })}
+              selectedVoice={selectedVoice} />
           ))}
           <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Input section */}
-      <div className="border-t px-3 sm:px-4 py-3 sm:py-4 backdrop-blur-xl shrink-0" style={{ borderColor: 'var(--glass-border)', background: 'var(--bg)' }}>
+      {/* Input section — unified, no mode toggle */}
+      <div className="border-t px-3 sm:px-4 py-3 sm:py-4 backdrop-blur-xl shrink-0"
+        style={{ borderColor: 'var(--glass-border)', background: 'var(--bg)' }}>
         <div className="max-w-3xl mx-auto">
-          {/* Attachments list */}
+          {/* Attachments */}
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {attachments.map((file, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border" style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)' }}>
+                <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border"
+                  style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)' }}>
                   <Paperclip className="w-3 h-3 text-muted" />
                   <span className="text-xs truncate max-w-[120px] sm:max-w-[150px]" style={{ color: "var(--fg)" }}>{file.name}</span>
-                  <button
-                    onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
-                    className="text-muted hover:text-white"
-                  >
+                  <button onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))} className="text-muted hover:text-white">
                     <X className="w-3 h-3" />
                   </button>
                 </div>
@@ -517,63 +398,44 @@ function ChatPage() {
             </div>
           )}
 
-          {/* Mode toggle bar */}
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              onClick={() => setImageMode(false)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${!imageMode ? "bg-primary/15 text-primary border border-primary/30" : "border border-transparent"}`}
-              style={!imageMode ? {} : { color: "var(--fg-muted)" }}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Chat</span>
-            </button>
-            <button
-              onClick={() => setImageMode(true)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${imageMode ? "bg-primary/15 text-primary border border-primary/30" : "border border-transparent"}`}
-              style={imageMode ? {} : { color: "var(--fg-muted)" }}
-            >
-              <ImageIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Image</span>
-            </button>
-          </div>
+          {/* Image mode indicator */}
+          {imageMode && (
+            <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+              <ImageIcon className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs text-primary">Image mode — type a prompt and send to generate an image</span>
+              <button onClick={() => setImageMode(false)} className="ml-auto text-muted hover:text-white">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
 
-          {/* Textarea & Send button */}
+          {/* Textarea & buttons */}
           <div className="flex items-end gap-2">
             <div className="flex-1 relative min-w-0">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder={imageMode ? "Describe the image you want..." : "Ask anything..."}
+              <textarea value={input} onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                placeholder={imageMode ? "Describe the image you want..." : "Ask anything... (tap image icon to generate images)"}
                 rows={1}
-                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-16 sm:pr-20 rounded-2xl border text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]" style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--fg)', height: "auto" }}
-                onInput={(e) => {
-                  e.currentTarget.style.height = "auto";
-                  e.currentTarget.style.height = e.currentTarget.scrollHeight + "px";
-                }}
-              />
+                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-24 sm:pr-28 rounded-2xl border text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]"
+                style={{ background: 'var(--input-bg)', borderColor: imageMode ? 'var(--primary, #3b82f6)' : 'var(--input-border)', color: 'var(--fg)', height: "auto" }}
+                onInput={(e) => { e.currentTarget.style.height = "auto"; e.currentTarget.style.height = e.currentTarget.scrollHeight + "px"; }} />
+              {/* Right side icons inside textarea */}
               <div className="absolute right-2 sm:right-3 bottom-2.5 sm:bottom-3 flex items-center gap-2">
+                {/* Image toggle */}
+                <button onClick={() => setImageMode(!imageMode)}
+                  className="transition-colors" style={{ color: imageMode ? "#3b82f6" : "var(--fg-muted)" }}
+                  title={imageMode ? "Exit image mode" : "Generate image"}>
+                  <ImageIcon className="w-4 h-4 hover:text-white" />
+                </button>
+                {/* Voice input */}
                 {voiceSupported && (
-                  <button
-                    onClick={() => {
-                      if (listening) {
-                        stopListening();
-                      } else {
-                        startListening((text) => setInput(text));
-                      }
-                    }}
-                    className="transition-colors"
-                    style={{ color: listening ? "#3b82f6" : "var(--fg-muted)" }}
-                    title={listening ? "Stop recording" : "Voice input"}
-                  >
+                  <button onClick={() => { if (listening) stopListening(); else startListening((text) => setInput(text)); }}
+                    className="transition-colors" style={{ color: listening ? "#3b82f6" : "var(--fg-muted)" }}
+                    title={listening ? "Stop recording" : "Voice input"}>
                     {listening ? <MicOff className="w-4 h-4 animate-pulse" /> : <Mic className="w-4 h-4 hover:text-white" />}
                   </button>
                 )}
+                {/* File upload */}
                 <label className="cursor-pointer">
                   <input type="file" multiple className="hidden" onChange={handleFileSelect} />
                   <Paperclip className="w-4 h-4 hover:text-white transition-colors" style={{ color: "var(--fg-muted)" }} />
@@ -582,18 +444,15 @@ function ChatPage() {
             </div>
 
             {isGenerating || generatingImage ? (
-              <Button variant="destructive" size="icon" onClick={imageMode ? () => setGeneratingImage(false) : handleStop} className="rounded-2xl shrink-0">
+              <Button variant="destructive" size="icon"
+                onClick={imageMode ? () => setGeneratingImage(false) : handleStop}
+                className="rounded-2xl shrink-0">
                 {generatingImage ? <Spinner size={16} /> : <Square className="w-4 h-4" />}
               </Button>
             ) : (
-              <Button
-                variant="primary"
-                size="icon"
-                onClick={handleSend}
-                disabled={!input.trim()}
-                className="rounded-2xl bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-md shadow-primary/20 shrink-0"
-              >
-                {imageMode ? <ImageIcon className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+              <Button variant="primary" size="icon" onClick={handleSend} disabled={!input.trim()}
+                className="rounded-2xl bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-md shadow-primary/20 shrink-0">
+                <Send className="w-4 h-4" />
               </Button>
             )}
           </div>
