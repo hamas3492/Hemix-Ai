@@ -40,11 +40,19 @@ interface ChatStore {
   resetDailyCount: () => void;
 }
 
+// Note: Identity enforcement is server-side in app/api/chat/route.ts (IDENTITY_BLOCK).
+// This frontend system prompt provides personality/behaviour context only.
+const HEMIX_BEHAVIOR_PROMPT =
+  "You are Hemix AI, a helpful and intelligent assistant. " +
+  "Keep answers short by default — a few sentences or a brief list. " +
+  "Only give a long, detailed answer when the user explicitly asks for more detail, a full explanation, or a guide. " +
+  "When generating code, ALWAYS complete the full code — never cut off mid-way.";
+
 const defaultChatSettings: ChatSettings = {
   temperature: 0.7,
   maxTokens: 16384,
   topP: 1,
-  systemPrompt: "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. You are Hemix AI, your own assistant. Keep answers short by default — a few sentences or a brief list. Only give a long detailed answer when the user explicitly asks for more detail, a full explanation, or a guide. When generating code, ALWAYS complete the full code.",
+  systemPrompt: HEMIX_BEHAVIOR_PROMPT,
   streamResponse: true,
 };
 
@@ -231,9 +239,13 @@ export const useChatStore = create<ChatStore>()(
     }),
     {
       name: "hemix-storage",
-      version: 3,
+      version: 4,
       migrate: (persisted: any, version: number) => {
         if (version < 2 && persisted?.chatSettings) {
+          persisted.chatSettings.systemPrompt = undefined;
+        }
+        if (version < 4 && persisted?.chatSettings) {
+          // Update to new behavior-only system prompt (identity is now server-side)
           persisted.chatSettings.systemPrompt = undefined;
         }
         return persisted;
@@ -243,10 +255,10 @@ export const useChatStore = create<ChatStore>()(
 );
 
 // Helper: get system prompt with personality
+// Note: Identity is enforced server-side. This returns behavior/personality context only.
 export function getSystemPrompt(chatSettings: ChatSettings, personality?: PersonalityId): string {
-  const basePrompt = "You are Hemix AI, a helpful and intelligent assistant created by Hamas Ahmed. When asked who made you, who built you, or who created you, your answer is Hamas Ahmed. You are Hemix AI, your own assistant. Keep answers short by default — a few sentences or a brief list. Only give a long detailed answer when the user explicitly asks for more detail, a full explanation, or a guide. When generating code, ALWAYS complete the full code.";
   if (personality && PERSONALITIES[personality]) {
-    return `${basePrompt}\n\n${PERSONALITIES[personality].prompt}`;
+    return `${HEMIX_BEHAVIOR_PROMPT}\n\n${PERSONALITIES[personality].prompt}`;
   }
-  return chatSettings.systemPrompt || basePrompt;
+  return chatSettings.systemPrompt || HEMIX_BEHAVIOR_PROMPT;
 }

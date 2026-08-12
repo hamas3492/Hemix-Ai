@@ -225,7 +225,7 @@ export function ChatBubble({
         ) : message.status === "streaming" && !message.content ? (
           <div className="py-2"><TypingIndicator /></div>
         ) : (
-          /* === TEXT MESSAGE === */}
+          /* === TEXT MESSAGE === */
           <>
             {isUser ? (
               <div className="rounded-2xl px-4 py-2.5 text-sm"

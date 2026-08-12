@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Send, Square, Paperclip, Download, Search, X,
   Mic, MicOff, Volume2, ChevronDown, Sparkles, User as UserIcon,
-  Bot, Cpu,
+  Bot, Cpu, Wand2,
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import type { Message, PersonalityId } from "@/types";
@@ -95,6 +95,7 @@ function ChatPage() {
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [imageViewer, setImageViewer] = useState<string | null>(null);
+  const [editingImagePrompt, setEditingImagePrompt] = useState<string | null>(null);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const { listening, supported: voiceSupported, start: startListening, stop: stopListening } = useVoiceInput();
@@ -172,12 +173,21 @@ function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: cleanPrompt }),
       });
-      if (!res.ok) throw new Error("Image generation failed");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        console.error("[chat] Image generation API error:", res.status, errBody);
+        throw new Error(errBody.error || "Image generation failed");
+      }
       const data = await res.json();
+      if (!data.url) {
+        console.error("[chat] Image generation: no URL in response", data);
+        throw new Error("No image URL returned");
+      }
       updateMessage(convId, imgMessage.id, { imageUrl: data.url, content: "", status: "complete" });
-    } catch {
+    } catch (err) {
+      console.error("[chat] Image generation error:", err);
       updateMessage(convId, imgMessage.id, {
-        content: "Image generation failed.", status: "error", type: "image",
+        content: "Image generation failed. Please try again.", status: "error", type: "image",
       });
     } finally {
       setGeneratingImage(false);
@@ -194,6 +204,16 @@ function ChatPage() {
   const handleImageVariation = useCallback((prompt: string, convId: string) => {
     handleImageGenerate(prompt, convId, false);
   }, [handleImageGenerate]);
+
+  // === IMAGE EDIT CLICK — focus input with edit context ===
+  const handleImageEditClick = useCallback((imagePrompt: string) => {
+    setEditingImagePrompt(imagePrompt);
+    setInput("");
+    setTimeout(() => {
+      const textarea = document.querySelector('textarea[placeholder*="Ask anything"]') as HTMLTextAreaElement;
+      textarea?.focus();
+    }, 50);
+  }, []);
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || isGenerating || generatingImage) return;
@@ -215,6 +235,13 @@ function ChatPage() {
     addMessage(convId!, userMessage);
     const currentInput = input.trim();
     setInput(""); setAttachments([]);
+
+    // === EXPLICIT IMAGE EDIT (from Edit button) ===
+    if (editingImagePrompt) {
+      await handleImageGenerate(currentInput, convId!, true, editingImagePrompt);
+      setEditingImagePrompt(null);
+      return;
+    }
 
     // === AUTO-DETECT IMAGE REQUEST ===
     if (isImageRequest(currentInput)) {
@@ -302,7 +329,7 @@ function ChatPage() {
       setGenerating(false);
       abortRef.current = null;
     }
-  }, [input, attachments, isGenerating, generatingImage, activeConv, activeConversationId, createConversation, addMessage, updateMessage, setGenerating, chatSettings, handleImageGenerate]);
+  }, [input, attachments, isGenerating, generatingImage, activeConv, activeConversationId, createConversation, addMessage, updateMessage, setGenerating, chatSettings, handleImageGenerate, editingImagePrompt]);
 
   const handleStop = () => { abortRef.current?.abort(); setGenerating(false); };
 
@@ -547,6 +574,7 @@ function ChatPage() {
               onImageClick={(url) => setImageViewer(url)}
               onImageRetry={() => handleImageRetry(activeConv.id, msg.id, msg.imagePrompt || "")}
               onImageVariation={() => handleImageVariation(msg.imagePrompt || "", activeConv.id)}
+              onImageEdit={() => handleImageEditClick(msg.imagePrompt || "")}
               selectedVoice={selectedVoice}
               onSpeak={(text) => handleSpeak(text, msg.id)}
               isSpeaking={speakingId === msg.id}
@@ -560,6 +588,19 @@ function ChatPage() {
       <div className="border-t px-3 sm:px-4 py-3 sm:py-4 backdrop-blur-xl shrink-0 chat-composer safe-bottom"
         style={{ borderColor: 'var(--glass-border)', background: 'var(--bg)' }}>
         <div className="max-w-3xl mx-auto">
+          {/* Editing image indicator */}
+          {editingImagePrompt && (
+            <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-lg border"
+              style={{ background: "var(--input-bg)", borderColor: "var(--primary, #3b82f6)" }}>
+              <span className="text-xs flex items-center gap-1.5" style={{ color: "var(--fg)" }}>
+                <Wand2 className="w-3.5 h-3.5 text-primary" />
+                Editing image: <span className="truncate max-w-[200px]" style={{ color: "var(--fg-muted)" }}>{editingImagePrompt}</span>
+              </span>
+              <button onClick={() => setEditingImagePrompt(null)} className="text-xs touch-target" style={{ color: "var(--fg-muted)" }}>
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           {/* Attachments */}
           {attachments.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
@@ -582,7 +623,7 @@ function ChatPage() {
             <div className="flex-1 relative min-w-0">
               <textarea value={input} onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                placeholder="Ask anything... (say 'generate an image of...' to create images)"
+                placeholder={editingImagePrompt ? "Describe your edit (e.g. make it darker, add rain)..." : "Ask anything... (say 'generate an image of...' to create images)"}
                 rows={1}
                 className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-20 sm:pr-24 rounded-2xl border text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]"
                 style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--fg)', height: "auto" }}
