@@ -34,9 +34,12 @@ export function VoiceConversation({
   useEffect(() => { systemPromptRef.current = systemPrompt; }, [systemPrompt]);
   useEffect(() => { mutedRef.current = muted; }, [muted]);
 
-  // --- Speak function (uses custom voice file if available, else best browser voice) ---
-  const speakText = useCallback((text: string, onDone: () => void) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+  // --- Speak function (uses custom TTS API with browser fallback) ---
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsAvailableRef = useRef<boolean | null>(null); // null = not checked yet
+
+  const speakText = useCallback(async (text: string, onDone: () => void) => {
+    if (typeof window === "undefined") {
       onDone();
       return;
     }
@@ -44,13 +47,90 @@ export function VoiceConversation({
     const clean = text.replace(/```[\s\S]*?```/g, " code block ").replace(/[*#`_>|]/g, "").trim();
     if (!clean) { onDone(); return; }
 
-    // Cancel any existing speech to prevent double audio
+    // Cancel any existing speech/audio to prevent double audio
+    window.speechSynthesis?.cancel();
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+
+    let doneCalled = false;
+    const callDone = () => {
+      if (!doneCalled) { doneCalled = true; onDone(); }
+    };
+
+    setState("speaking");
+
+    // Check if custom TTS API is available (once per session)
+    if (ttsAvailableRef.current === null) {
+      try {
+        const check = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "test" }),
+        });
+        ttsAvailableRef.current = check.ok;
+      } catch {
+        ttsAvailableRef.current = false;
+      }
+    }
+
+    // If custom TTS is available, use it (plays the user's cloned voice)
+    if (ttsAvailableRef.current) {
+      try {
+        const response = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const audioUrl = URL.createObjectURL(blob);
+          const audio = new Audio(audioUrl);
+          audioRef.current = audio;
+
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            audioRef.current = null;
+            if (isMounted.current) callDone();
+            else callDone();
+          };
+          audio.onerror = () => {
+            URL.revokeObjectURL(audioUrl);
+            audioRef.current = null;
+            // Fall back to browser TTS on error
+            browserSpeak(clean, callDone);
+          };
+
+          await audio.play().catch(() => {
+            URL.revokeObjectURL(audioUrl);
+            audioRef.current = null;
+            browserSpeak(clean, callDone);
+          });
+          return;
+        } else {
+          // TTS not configured — fall back to browser
+          ttsAvailableRef.current = false;
+        }
+      } catch {
+        ttsAvailableRef.current = false;
+      }
+    }
+
+    // Browser TTS fallback
+    browserSpeak(clean, callDone);
+  }, []);
+
+  // Browser TTS helper (fallback when no custom TTS API)
+  const browserSpeak = useCallback((text: string, onDone: () => void) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      onDone();
+      return;
+    }
+
     window.speechSynthesis.cancel();
 
-    const utter = new SpeechSynthesisUtterance(clean);
+    const utter = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
 
-    // Pick the best natural-sounding voice available
     const preferredVoice =
       voices.find(v => /google.*us.*english/i.test(v.name)) ||
       voices.find(v => /google.*english/i.test(v.name)) ||
@@ -72,8 +152,6 @@ export function VoiceConversation({
     utter.onend = callDone;
     utter.onerror = callDone;
 
-    setState("speaking");
-    // Small delay after cancel to ensure clean playback
     setTimeout(() => {
       if (isMounted.current) window.speechSynthesis.speak(utter);
       else callDone();
@@ -256,6 +334,7 @@ export function VoiceConversation({
   const handleInterrupt = useCallback(() => {
     if (state === "speaking") {
       window.speechSynthesis?.cancel();
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
       isProcessing.current = false;
       startListening();
     } else if (state === "listening") {
@@ -268,6 +347,7 @@ export function VoiceConversation({
   const handleClose = useCallback(() => {
     try { recognitionRef.current?.abort(); } catch {}
     try { window.speechSynthesis?.cancel(); } catch {}
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     isProcessing.current = false;
     onClose();
   }, [onClose]);
