@@ -83,7 +83,6 @@ function ChatPage() {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const [generatingImage, setGeneratingImage] = useState(false);
-  const [selectedVoice] = useState(0);
   const [imageViewer, setImageViewer] = useState<string | null>(null);
   const [editingImagePrompt, setEditingImagePrompt] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -125,13 +124,20 @@ function ChatPage() {
     if (!clean) return;
     const u = new SpeechSynthesisUtterance(clean);
     const voices = window.speechSynthesis.getVoices();
-    if (voices.length > selectedVoice) u.voice = voices[selectedVoice];
+    const preferredVoice =
+      voices.find(v => /google.*us.*english/i.test(v.name)) ||
+      voices.find(v => /google.*english/i.test(v.name)) ||
+      voices.find(v => /samantha|alex|daniel|karen|moira|tessa|fiona|serena|aaron|nicky/i.test(v.name)) ||
+      voices.find(v => v.lang === "en-US" && /natural|enhanced|premium/i.test(v.name)) ||
+      voices.find(v => v.lang === "en-US") ||
+      voices.find(v => v.lang.startsWith("en"));
+    if (preferredVoice) u.voice = preferredVoice;
     u.onend = () => setSpeakingId(null);
     u.onerror = () => setSpeakingId(null);
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
     setSpeakingId(msgId);
-  }, [speakingId, selectedVoice]);
+  }, [speakingId]);
 
   // === IMAGE GENERATION ===
   const handleImageGenerate = useCallback(async (prompt: string, convId: string, isEdit = false, editContext?: string) => {
@@ -227,7 +233,7 @@ function ChatPage() {
   }, []);
 
   const handleSend = useCallback(async () => {
-    if (!input.trim() || isGenerating || generatingImage) return;
+    if ((!input.trim() && attachments.length === 0) || isGenerating || generatingImage) return;
 
     let convId = activeConversationId;
     if (!activeConv) convId = createConversation("hemix-1");
@@ -238,13 +244,16 @@ function ChatPage() {
       if (content) fileContents.push(`[File: ${file.name}]\n${content}`);
     }
 
+    const messageText = input.trim() || (attachments.length > 0 ? "Please review the attached file(s)." : "");
+    if (!messageText) return;
+
     const userMessage: Message = {
-      id: nanoid(), role: "user", content: input.trim(),
+      id: nanoid(), role: "user", content: messageText,
       createdAt: new Date().toISOString(),
       attachments: attachments.map((f) => ({ id: nanoid(), name: f.name, type: f.type, size: f.size })),
     };
     addMessage(convId!, userMessage);
-    const currentInput = input.trim();
+    const currentInput = messageText;
     setInput(""); setAttachments([]);
 
     // === EXPLICIT IMAGE EDIT (from Edit button) ===
@@ -461,7 +470,6 @@ function ChatPage() {
               onImageRetry={() => handleImageRetry(activeConv.id, msg.id, msg.imagePrompt || "")}
               onImageVariation={() => handleImageVariation(msg.imagePrompt || "", activeConv.id)}
               onImageEdit={() => handleImageEditClick(msg.imagePrompt || "")}
-              selectedVoice={selectedVoice}
               onSpeak={(text) => handleSpeak(text, msg.id)}
               isSpeaking={speakingId === msg.id}
             />
@@ -552,7 +560,7 @@ function ChatPage() {
                     {generatingImage ? <Spinner size={16} /> : <Square className="w-4 h-4" />}
                   </button>
                 ) : (
-                  <button onClick={handleSend} disabled={!input.trim()}
+                  <button onClick={handleSend} disabled={!input.trim() && attachments.length === 0}
                     className="p-2 rounded-xl shrink-0 touch-target flex items-center justify-center transition-opacity hover:opacity-80 disabled:opacity-30"
                     style={{ background: "var(--fg)", color: "var(--bg)" }}
                     aria-label="Send message">
@@ -578,7 +586,6 @@ function ChatPage() {
       {voiceMode && (
         <VoiceConversation
           onClose={() => setVoiceMode(false)}
-          selectedVoice={selectedVoice}
           messages={voiceMessages}
           onUserMessage={handleVoiceUserMessage}
           onAIResponse={handleVoiceAIResponse}

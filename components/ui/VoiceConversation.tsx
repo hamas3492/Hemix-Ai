@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 interface VoiceConversationProps {
   onClose: () => void;
-  selectedVoice: number;
+  selectedVoice?: number;
   onVoiceChange?: (v: number) => void;
   messages: Array<{ role: string; content: string }>;
   onUserMessage: (text: string) => void;
@@ -18,7 +18,7 @@ interface VoiceConversationProps {
 type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
 
 export function VoiceConversation({
-  onClose, selectedVoice, onVoiceChange, messages, onUserMessage, onAIResponse, systemPrompt,
+  onClose, selectedVoice = 0, messages, onUserMessage, onAIResponse, systemPrompt,
 }: VoiceConversationProps) {
   const [state, setState] = useState<VoiceState>("idle");
   const [transcript, setTranscript] = useState("");
@@ -176,7 +176,18 @@ export function VoiceConversation({
 
     const utter = new SpeechSynthesisUtterance(clean);
     const voices = window.speechSynthesis.getVoices();
-    if (voices.length > selectedVoice) utter.voice = voices[selectedVoice];
+
+    // Pick the best natural-sounding voice available — prefer Google US English
+    const preferredVoice =
+      voices.find(v => /google.*us.*english/i.test(v.name)) ||
+      voices.find(v => /google.*english/i.test(v.name)) ||
+      voices.find(v => /samantha|alex|daniel|karen|moira|tessa|fiona|serena|aaron|nicky/i.test(v.name)) ||
+      voices.find(v => v.lang === "en-US" && /natural|enhanced|premium/i.test(v.name)) ||
+      voices.find(v => v.lang === "en-US") ||
+      voices.find(v => v.lang.startsWith("en")) ||
+      voices[selectedVoice];
+
+    if (preferredVoice) utter.voice = preferredVoice;
     utter.rate = 1; utter.pitch = 1; utter.volume = 1;
 
     utter.onend = () => {
@@ -193,7 +204,7 @@ export function VoiceConversation({
     setState("speaking");
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utter);
-  }, [selectedVoice]);
+  }, [selectedVoice]);  // selectedVoice kept as fallback only
 
   // Interrupt speaking
   const handleInterrupt = useCallback(() => {
