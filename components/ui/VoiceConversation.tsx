@@ -2,13 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, X, Volume2, Phone, ChevronDown } from "lucide-react";
+import { Mic, MicOff, X, Volume2, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface VoiceConversationProps {
   onClose: () => void;
   selectedVoice: number;
-  onVoiceChange: (v: number) => void;
+  onVoiceChange?: (v: number) => void;
   messages: Array<{ role: string; content: string }>;
   onUserMessage: (text: string) => void;
   onAIResponse: (text: string) => void;
@@ -25,22 +25,12 @@ export function VoiceConversation({
   const [lastUserText, setLastUserText] = useState("");
   const [lastAIText, setLastAIText] = useState("");
   const [muted, setMuted] = useState(false);
-  const [showVoicePicker, setShowVoicePicker] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const recognitionRef = useRef<any>(null);
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMounted = useRef(true);
 
   useEffect(() => {
     isMounted.current = true;
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      const loadVoices = () => {
-        const v = window.speechSynthesis.getVoices();
-        if (v.length > 0) setAvailableVoices(v);
-      };
-      loadVoices();
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
 
     // Setup speech recognition
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -237,13 +227,17 @@ export function VoiceConversation({
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-between"
-      style={{
-        background: "linear-gradient(180deg, rgba(5,5,5,0.98) 0%, rgba(15,17,21,0.98) 100%)",
-        paddingTop: "env(safe-area-inset-top)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-0 lg:p-6"
+      style={{ background: "rgba(0,0,0,0.85)" }}
     >
+      <div
+        className="relative flex flex-col items-center justify-between w-full h-full lg:max-w-2xl lg:max-h-[80vh] lg:rounded-3xl overflow-hidden"
+        style={{
+          background: "linear-gradient(180deg, rgba(5,5,5,0.98) 0%, rgba(15,17,21,0.98) 100%)",
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
       {/* === TOP BAR === */}
       <div className="w-full flex items-center justify-between px-4 py-4">
         <button onClick={handleClose}
@@ -266,30 +260,6 @@ export function VoiceConversation({
             style={{ color: "var(--fg)" }} aria-label="Mute/unmute">
             {muted ? <MicOff className="w-5 h-5 text-red-400" /> : <Volume2 className="w-5 h-5" />}
           </button>
-          {/* Voice selector */}
-          <div className="relative">
-            <button onClick={() => setShowVoicePicker(!showVoicePicker)}
-              className="p-2.5 rounded-xl glass-strong hover:bg-white/10 transition-colors touch-target no-select"
-              style={{ color: "var(--fg)" }} aria-label="Select voice">
-              <ChevronDown className="w-5 h-5" />
-            </button>
-            <AnimatePresence>
-              {showVoicePicker && (
-                <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-                  className="absolute right-0 top-full mt-2 z-50 w-64 max-h-64 overflow-y-auto rounded-xl border shadow-2xl"
-                  style={{ background: "var(--input-bg)", borderColor: "var(--input-border)" }}>
-                  {availableVoices.slice(0, 20).map((voice, i) => (
-                    <button key={i}
-                      onClick={() => { onVoiceChange(i); setShowVoicePicker(false); }}
-                      className={`w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors ${selectedVoice === i ? "text-primary font-medium" : ""}`}
-                      style={selectedVoice === i ? {} : { color: "var(--fg)" }}>
-                      {voice.name} <span style={{ color: "var(--fg-muted)" }}>({voice.lang})</span>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
         </div>
       </div>
 
@@ -402,6 +372,7 @@ export function VoiceConversation({
         <p className="text-xs" style={{ color: "var(--fg-muted)" }}>
           {state === "speaking" ? "Tap to interrupt" : state === "listening" ? "Tap to stop" : "Tap to talk"}
         </p>
+      </div>
       </div>
     </motion.div>
   );

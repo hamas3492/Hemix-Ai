@@ -4,21 +4,18 @@ import { useState, useRef, useCallback, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Send, Square, Paperclip, Download, Search, X,
-  Mic, MicOff, Volume2, ChevronDown, Sparkles, User as UserIcon,
-  Bot, Cpu, Wand2,
+  Square, Paperclip, X,
+  Mic, MicOff, Wand2, Plus, ArrowUp, AudioLines,
 } from "lucide-react";
 import { nanoid } from "nanoid";
-import type { Message, PersonalityId } from "@/types";
-import { PERSONALITIES } from "@/types";
+import type { Message } from "@/types";
 import { useChatStore, getSystemPrompt } from "@/lib/store";
 import { ChatBubble } from "@/components/ui/ChatBubble";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { showSuccess } from "@/components/ui/Toast";
 import { useAutoScroll, useVoiceInput } from "@/hooks";
-import { downloadFile, copyToClipboard } from "@/lib/utils";
-import { AI_MODELS } from "@/lib/models";
+import { copyToClipboard } from "@/lib/utils";
 
 // Lazy load heavy components
 import dynamic from "next/dynamic";
@@ -79,40 +76,24 @@ function ChatPage() {
   const {
     conversations, activeConversationId, createConversation,
     addMessage, updateMessage, deleteMessage,
-    isGenerating, setGenerating, chatSettings, exportConversation,
-    updateConversationModel, updateConversationPersonality,
+    isGenerating, setGenerating, chatSettings,
+    voiceModeOpen: voiceMode, setVoiceModeOpen: setVoiceMode,
   } = useChatStore();
 
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   const [generatingImage, setGeneratingImage] = useState(false);
-  const [selectedVoice, setSelectedVoice] = useState(0);
-  const [showVoicePicker, setShowVoicePicker] = useState(false);
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [showPersonality, setShowPersonality] = useState(false);
-  const [showModelSelector, setShowModelSelector] = useState(false);
-  const [voiceMode, setVoiceMode] = useState(false);
+  const [selectedVoice] = useState(0);
   const [imageViewer, setImageViewer] = useState<string | null>(null);
   const [editingImagePrompt, setEditingImagePrompt] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const imageAbortRef = useRef<AbortController | null>(null);
   const { listening, supported: voiceSupported, start: startListening, stop: stopListening } = useVoiceInput();
   const messagesEndRef = useAutoScroll<HTMLDivElement>([conversations]);
 
   const activeConv = conversations.find((c) => c.id === (conversationId || activeConversationId));
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      const loadVoices = () => {
-        const v = window.speechSynthesis.getVoices();
-        if (v.length > 0) setAvailableVoices(v);
-      };
-      loadVoices();
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
-  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -167,11 +148,13 @@ function ChatPage() {
     };
     addMessage(convId, imgMessage);
 
+    imageAbortRef.current = new AbortController();
     try {
       const res = await fetch("/api/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: cleanPrompt }),
+        signal: imageAbortRef.current.signal,
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
@@ -185,12 +168,19 @@ function ChatPage() {
       }
       updateMessage(convId, imgMessage.id, { imageUrl: data.url, content: "", status: "complete" });
     } catch (err) {
-      console.error("[chat] Image generation error:", err);
-      updateMessage(convId, imgMessage.id, {
-        content: "Image generation failed. Please try again.", status: "error", type: "image",
-      });
+      if (err instanceof Error && err.name === "AbortError") {
+        updateMessage(convId, imgMessage.id, {
+          content: "Image generation cancelled.", status: "error", type: "image",
+        });
+      } else {
+        console.error("[chat] Image generation error:", err);
+        updateMessage(convId, imgMessage.id, {
+          content: "Image generation failed. Please try again.", status: "error", type: "image",
+        });
+      }
     } finally {
       setGeneratingImage(false);
+      imageAbortRef.current = null;
     }
   }, [addMessage, updateMessage]);
 
@@ -213,6 +203,27 @@ function ChatPage() {
       const textarea = document.querySelector('textarea[placeholder*="Ask anything"]') as HTMLTextAreaElement;
       textarea?.focus();
     }, 50);
+  }, []);
+
+  // === DRAG & DROP FILE HANDLERS ===
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) setAttachments((prev) => [...prev, ...files]);
   }, []);
 
   const handleSend = useCallback(async () => {
@@ -331,7 +342,12 @@ function ChatPage() {
     }
   }, [input, attachments, isGenerating, generatingImage, activeConv, activeConversationId, createConversation, addMessage, updateMessage, setGenerating, chatSettings, handleImageGenerate, editingImagePrompt]);
 
-  const handleStop = () => { abortRef.current?.abort(); setGenerating(false); };
+  const handleStop = () => {
+    abortRef.current?.abort();
+    imageAbortRef.current?.abort();
+    setGenerating(false);
+    setGeneratingImage(false);
+  };
 
   const handleRegenerate = useCallback(async () => {
     if (!activeConv || activeConv.messages.length < 2) return;
@@ -341,13 +357,6 @@ function ChatPage() {
     setInput(lastUserMsg.content);
     setTimeout(() => handleSend(), 100);
   }, [activeConv, deleteMessage, handleSend]);
-
-  const handleExport = () => {
-    if (!activeConv) return;
-    const content = exportConversation(activeConv.id);
-    downloadFile(content, `${activeConv.title.replace(/\s+/g, "-").toLowerCase()}.md`, "text/markdown");
-    showSuccess("Conversation exported");
-  };
 
   // === VOICE CONVERSATION CALLBACKS ===
   const handleVoiceUserMessage = useCallback((text: string) => {
@@ -408,165 +417,42 @@ function ChatPage() {
     );
   }
 
-  const filteredMessages = showSearch && searchTerm
-    ? activeConv.messages.filter((m) => m.content.toLowerCase().includes(searchTerm.toLowerCase()))
-    : activeConv.messages;
-
-  const currentModel = AI_MODELS.find(m => m.id === activeConv.model) || AI_MODELS[0];
-  const currentPersonality = activeConv.personality ? PERSONALITIES[activeConv.personality] : null;
-
   // Voice conversation messages (simplified for the voice component)
   const voiceMessages = activeConv.messages.map(m => ({ role: m.role, content: m.content }));
 
   return (
     <div className="flex flex-col h-full min-w-0">
-      {/* === HEADER === */}
+      {/* === HEADER — minimal, ChatGPT-style === */}
       <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 border-b shrink-0" style={{ borderColor: 'var(--glass-border)' }}>
         <div className="flex items-center gap-2 min-w-0">
-          {/* Model selector */}
-          <div className="relative">
-            <button onClick={() => setShowModelSelector(!showModelSelector)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium hover:bg-white/5 transition-colors touch-target"
-              style={{ color: "var(--fg)" }}>
-              {currentModel.id === "hemix-1" ? <Bot className="w-4 h-4 text-primary" /> :
-               currentModel.id === "auto" ? <Sparkles className="w-4 h-4 text-primary" /> :
-               <Cpu className="w-4 h-4 text-primary" />}
-              <span className="truncate max-w-[80px] sm:max-w-[120px]">{currentModel.name}</span>
-              <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: "var(--fg-muted)" }} />
-            </button>
-            <AnimatePresence>
-              {showModelSelector && (
-                <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-                  className="absolute left-0 top-full mt-1 z-50 w-64 rounded-xl border shadow-2xl py-1"
-                  style={{ background: "var(--card-bg)", borderColor: "var(--input-border)" }}>
-                  {AI_MODELS.map((model) => (
-                    <button key={model.id}
-                      onClick={() => { updateConversationModel(activeConv.id, model.id); setShowModelSelector(false); }}
-                      className={`w-full text-left px-3 py-2.5 hover:bg-white/5 transition-colors flex items-center gap-2.5 ${model.id === activeConv.model ? "text-primary" : ""}`}
-                      style={model.id === activeConv.model ? {} : { color: "var(--fg)" }}>
-                      {model.id === "hemix-1" ? <Bot className="w-4 h-4 shrink-0" /> :
-                       model.id === "auto" ? <Sparkles className="w-4 h-4 shrink-0" /> :
-                       <Cpu className="w-4 h-4 shrink-0" />}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{model.name}</p>
-                        <p className="text-xs truncate" style={{ color: "var(--fg-muted)" }}>{model.description}</p>
-                      </div>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+          <div className="w-6 h-6 rounded-md overflow-hidden shrink-0">
+            <img src="/assets/icon.png" alt="Hemix AI" className="w-full h-full object-cover" />
           </div>
-
-          {/* Personality selector */}
-          <div className="relative">
-            <button onClick={() => setShowPersonality(!showPersonality)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm hover:bg-white/5 transition-colors touch-target"
-              style={{ color: "var(--fg-muted)" }}>
-              <UserIcon className="w-4 h-4" />
-              <span className="hidden sm:inline truncate max-w-[80px]">{currentPersonality ? currentPersonality.name : "Default"}</span>
-              <ChevronDown className="w-3.5 h-3.5 shrink-0" />
-            </button>
-            <AnimatePresence>
-              {showPersonality && (
-                <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-                  className="absolute left-0 top-full mt-1 z-50 w-64 rounded-xl border shadow-2xl py-1"
-                  style={{ background: "var(--card-bg)", borderColor: "var(--input-border)" }}>
-                  <p className="px-3 py-2 text-xs border-b" style={{ color: "var(--fg-muted)", borderColor: "var(--input-border)" }}>
-                    AI Personality
-                  </p>
-                  <button onClick={() => { updateConversationPersonality(activeConv.id, "friendly" as PersonalityId); setShowPersonality(false); }}
-                    className="w-full text-left px-3 py-2.5 hover:bg-white/5 transition-colors" style={{ color: "var(--fg)" }}>
-                    <p className="text-sm font-medium">Default</p>
-                    <p className="text-xs" style={{ color: "var(--fg-muted)" }}>Balanced and helpful</p>
-                  </button>
-                  {(Object.keys(PERSONALITIES) as PersonalityId[]).map((id) => (
-                    <button key={id}
-                      onClick={() => { updateConversationPersonality(activeConv.id, id); setShowPersonality(false); }}
-                      className={`w-full text-left px-3 py-2.5 hover:bg-white/5 transition-colors ${activeConv.personality === id ? "text-primary" : ""}`}
-                      style={activeConv.personality === id ? {} : { color: "var(--fg)" }}>
-                      <p className="text-sm font-medium">{PERSONALITIES[id].name}</p>
-                      <p className="text-xs" style={{ color: "var(--fg-muted)" }}>{PERSONALITIES[id].description}</p>
-                    </button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1 shrink-0">
-          {/* Voice mode button */}
-          <Button variant="ghost" size="icon" onClick={() => setVoiceMode(true)} title="Voice conversation"
-            className="touch-target" aria-label="Open voice conversation">
-            <Mic className="w-4 h-4" style={{ color: "var(--fg-muted)" }} />
-          </Button>
-          {/* Voice selector */}
-          <div className="relative">
-            <Button variant="ghost" size="icon" onClick={() => setShowVoicePicker(!showVoicePicker)} title="Select voice"
-              className="hidden sm:flex touch-target" aria-label="Select TTS voice">
-              <Volume2 className="w-4 h-4" style={{ color: "var(--fg-muted)" }} />
-            </Button>
-            <AnimatePresence>
-              {showVoicePicker && (
-                <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}
-                  className="absolute right-0 top-full mt-2 z-50 w-64 max-h-64 overflow-y-auto rounded-xl border shadow-2xl"
-                  style={{ background: "var(--input-bg)", borderColor: "var(--input-border)" }}>
-                  <p className="px-3 py-2 text-xs border-b" style={{ color: "var(--fg-muted)", borderColor: "var(--input-border)" }}>
-                    Select Voice ({availableVoices.length} available)
-                  </p>
-                  {availableVoices.slice(0, 20).map((voice, i) => (
-                    <button key={i}
-                      onClick={() => { setSelectedVoice(i); setShowVoicePicker(false);
-                        const u = new SpeechSynthesisUtterance("Hello, I am Hemix AI.");
-                        u.voice = voice; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
-                      }}
-                      className={`w-full text-left px-3 py-2 text-xs hover:bg-white/5 transition-colors ${selectedVoice === i ? "text-primary font-medium" : ""}`}
-                      style={selectedVoice === i ? {} : { color: "var(--fg)" }}>
-                      {voice.name} <span style={{ color: "var(--fg-muted)" }}>({voice.lang})</span>
-                    </button>
-                  ))}
-                  {availableVoices.length === 0 && <p className="px-3 py-4 text-xs" style={{ color: "var(--fg-muted)" }}>No voices available</p>}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-          <Button variant="ghost" size="icon" onClick={() => setShowSearch(!showSearch)} title="Search"
-            className="hidden sm:flex touch-target" aria-label="Search messages">
-            <Search className="w-4 h-4" style={{ color: "var(--fg-muted)" }} />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleExport} title="Export"
-            className="hidden sm:flex touch-target" aria-label="Export conversation">
-            <Download className="w-4 h-4" style={{ color: "var(--fg-muted)" }} />
-          </Button>
+          <h1 className="text-sm font-medium truncate" style={{ color: "var(--fg)" }}>{activeConv.title}</h1>
         </div>
       </div>
 
-      {/* === SEARCH BAR === */}
-      <AnimatePresence>
-        {showSearch && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden px-3 sm:px-4 border-b border-white/5">
-            <div className="relative py-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
-              <input type="text" placeholder="Search in conversation..." value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 rounded-lg bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-primary/50"
-                style={{ color: "var(--fg)" }} autoFocus />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* === MESSAGES === */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 min-h-0 chat-scroll"
+      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 min-h-0 chat-scroll relative"
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
         style={{ backgroundImage: "radial-gradient(rgba(139,92,246,0.06) 1px, transparent 1px)", backgroundSize: "22px 22px" }}>
+        {isDragging && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center"
+            onDragLeave={handleDragLeave}
+            style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}>
+            <div className="rounded-2xl border-2 border-dashed p-8 text-center"
+              style={{ borderColor: "var(--primary, #3b82f6)", background: "var(--card-bg)" }}>
+              <Paperclip className="w-10 h-10 mx-auto mb-3 text-primary" />
+              <p className="text-sm font-medium" style={{ color: "var(--fg)" }}>Drop files to attach</p>
+            </div>
+          </div>
+        )}
         <div className="max-w-3xl mx-auto space-y-3.5 sm:space-y-5">
-          {filteredMessages.map((msg, i) => (
+          {activeConv.messages.map((msg, i) => (
             <ChatBubble
               key={msg.id} message={msg} isLast={i === activeConv.messages.length - 1}
               onRegenerate={handleRegenerate}
-              onDelete={() => deleteMessage(activeConv.id, msg.id)}
               onEdit={(newContent) => updateMessage(activeConv.id, msg.id, { content: newContent, edited: true })}
               onLike={() => updateMessage(activeConv.id, msg.id, { liked: !msg.liked, disliked: false })}
               onDislike={() => updateMessage(activeConv.id, msg.id, { disliked: !msg.disliked, liked: false })}
@@ -584,7 +470,7 @@ function ChatPage() {
         </div>
       </div>
 
-      {/* === COMPOSER === */}
+      {/* === COMPOSER — ChatGPT-style unified bar === */}
       <div className="border-t px-3 sm:px-4 py-3 sm:py-4 backdrop-blur-xl shrink-0 chat-composer safe-bottom"
         style={{ borderColor: 'var(--glass-border)', background: 'var(--bg)' }}>
         <div className="max-w-3xl mx-auto">
@@ -618,42 +504,63 @@ function ChatPage() {
             </div>
           )}
 
-          {/* Textarea & buttons */}
+          {/* Unified input container */}
           <div className="flex items-end gap-2">
             <div className="flex-1 relative min-w-0">
               <textarea value={input} onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                placeholder={editingImagePrompt ? "Describe your edit (e.g. make it darker, add rain)..." : "Ask anything... (say 'generate an image of...' to create images)"}
+                placeholder={editingImagePrompt ? "Describe your edit..." : "Message Hemix AI"}
                 rows={1}
-                className="w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-20 sm:pr-24 rounded-2xl border text-sm resize-none focus:outline-none focus:border-primary/50 transition-colors min-h-[48px] sm:min-h-[52px] max-h-[200px]"
+                className="w-full pl-11 pr-12 sm:pr-14 py-3 sm:py-3.5 rounded-3xl border text-sm resize-none focus:outline-none transition-colors min-h-[52px] sm:min-h-[56px] max-h-[200px]"
                 style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)', color: 'var(--fg)', height: "auto" }}
                 onInput={(e) => { e.currentTarget.style.height = "auto"; e.currentTarget.style.height = e.currentTarget.scrollHeight + "px"; }} />
-              <div className="absolute right-2 sm:right-3 bottom-2.5 sm:bottom-3 flex items-center gap-2">
-                {voiceSupported && (
-                  <button onClick={() => { if (listening) stopListening(); else startListening((text) => setInput(text)); }}
-                    className="transition-colors touch-target no-select" style={{ color: listening ? "#3b82f6" : "var(--fg-muted)" }}
-                    title={listening ? "Stop recording" : "Voice input"} aria-label={listening ? "Stop recording" : "Voice input"}>
-                    {listening ? <MicOff className="w-4 h-4 animate-pulse" /> : <Mic className="w-4 h-4 hover:text-white" />}
-                  </button>
-                )}
-                <label className="cursor-pointer touch-target no-select" aria-label="Attach files">
+
+              {/* Left: + attach button */}
+              <div className="absolute left-2.5 sm:left-3 bottom-2.5 sm:bottom-3 flex items-center gap-1">
+                <label className="cursor-pointer touch-target no-select p-1 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center" aria-label="Attach files"
+                  style={{ color: "var(--fg-muted)" }}>
                   <input type="file" multiple className="hidden" onChange={handleFileSelect} />
-                  <Paperclip className="w-4 h-4 hover:text-white transition-colors" style={{ color: "var(--fg-muted)" }} />
+                  <Plus className="w-5 h-5" />
                 </label>
               </div>
-            </div>
 
-            {isGenerating || generatingImage ? (
-              <Button variant="destructive" size="icon" onClick={handleStop} className="rounded-2xl shrink-0 touch-target" aria-label="Stop generation">
-                {generatingImage ? <Spinner size={16} /> : <Square className="w-4 h-4" />}
-              </Button>
-            ) : (
-              <Button variant="primary" size="icon" onClick={handleSend} disabled={!input.trim()}
-                className="rounded-2xl bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-md shadow-primary/20 shrink-0 touch-target"
-                aria-label="Send message">
-                <Send className="w-4 h-4" />
-              </Button>
-            )}
+              {/* Right: mic + voice-assistant + send */}
+              <div className="absolute right-2 sm:right-2.5 bottom-2 sm:bottom-2.5 flex items-center gap-1">
+                {voiceSupported && (
+                  <button onClick={() => { if (listening) stopListening(); else startListening((text) => setInput(text)); }}
+                    className="p-1.5 rounded-full hover:bg-white/10 transition-colors touch-target no-select"
+                    style={{ color: listening ? "#3b82f6" : "var(--fg-muted)" }}
+                    title={listening ? "Stop recording" : "Voice typing"}
+                    aria-label={listening ? "Stop recording" : "Voice typing"}>
+                    {listening ? <MicOff className="w-4 h-4 animate-pulse" /> : <Mic className="w-4 h-4" />}
+                  </button>
+                )}
+                {/* Voice assistant — opens full voice conversation */}
+                <button onClick={() => setVoiceMode(true)}
+                  className="p-1.5 rounded-full hover:bg-white/10 transition-colors touch-target no-select"
+                  style={{ color: "var(--fg-muted)" }}
+                  title="Voice assistant"
+                  aria-label="Open voice assistant">
+                  <AudioLines className="w-4 h-4" />
+                </button>
+                {/* Send / Stop button — black rounded square inside the input */}
+                {isGenerating || generatingImage ? (
+                  <button onClick={handleStop}
+                    className="p-2 rounded-xl shrink-0 touch-target flex items-center justify-center transition-opacity hover:opacity-80"
+                    style={{ background: "var(--fg)", color: "var(--bg)" }}
+                    aria-label="Stop generation">
+                    {generatingImage ? <Spinner size={16} /> : <Square className="w-4 h-4" />}
+                  </button>
+                ) : (
+                  <button onClick={handleSend} disabled={!input.trim()}
+                    className="p-2 rounded-xl shrink-0 touch-target flex items-center justify-center transition-opacity hover:opacity-80 disabled:opacity-30"
+                    style={{ background: "var(--fg)", color: "var(--bg)" }}
+                    aria-label="Send message">
+                    <ArrowUp className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           <p className="text-[10px] sm:text-xs text-center mt-2" style={{ color: "var(--fg-muted)" }}>
@@ -672,7 +579,6 @@ function ChatPage() {
         <VoiceConversation
           onClose={() => setVoiceMode(false)}
           selectedVoice={selectedVoice}
-          onVoiceChange={setSelectedVoice}
           messages={voiceMessages}
           onUserMessage={handleVoiceUserMessage}
           onAIResponse={handleVoiceAIResponse}

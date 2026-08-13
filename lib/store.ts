@@ -38,6 +38,10 @@ interface ChatStore {
   incrementMessageCount: () => void;
   setSubscription: (subscription: SubscriptionRecord | null) => void;
   resetDailyCount: () => void;
+
+  // UI state (not persisted)
+  voiceModeOpen: boolean;
+  setVoiceModeOpen: (open: boolean) => void;
 }
 
 // Note: Identity enforcement is server-side in app/api/chat/route.ts (IDENTITY_BLOCK).
@@ -81,6 +85,8 @@ export const useChatStore = create<ChatStore>()(
       subscription: null,
       dailyMessageCount: 0,
       lastMessageDate: new Date().toISOString().split("T")[0],
+
+      voiceModeOpen: false,
 
       createConversation: (model: string) => {
         const id = nanoid();
@@ -236,6 +242,8 @@ export const useChatStore = create<ChatStore>()(
         const today = new Date().toISOString().split("T")[0];
         set({ dailyMessageCount: 0, lastMessageDate: today });
       },
+
+      setVoiceModeOpen: (open: boolean) => set({ voiceModeOpen: open }),
     }),
     {
       name: "hemix-storage",

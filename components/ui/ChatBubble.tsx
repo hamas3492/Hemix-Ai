@@ -2,9 +2,9 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Copy, Check, RotateCcw, Trash2, Pencil, Volume2, Pause, Download,
+  Copy, Check, RotateCcw, Pencil, Volume2, Pause, Download,
   ThumbsUp, ThumbsDown, Share2, MoreHorizontal, Maximize2, Wand2,
-  Image as ImageIcon, AlertCircle, RefreshCw,
+  Image as ImageIcon, AlertCircle, RefreshCw, Square,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -13,7 +13,8 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import type { Message } from "@/types";
 import { copyToClipboard, downloadFile, cn } from "@/lib/utils";
 import { TypingIndicator } from "@/components/ui/Spinner";
-import { useState, useRef, useEffect } from "react";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { useState, useRef, useEffect, memo } from "react";
 
 const LANG_EXT: Record<string, string> = {
   javascript: "js", js: "js", jsx: "jsx", typescript: "ts", ts: "ts", tsx: "tsx",
@@ -43,7 +44,7 @@ interface ChatBubbleProps {
   isSpeaking?: boolean;
 }
 
-export function ChatBubble({
+export const ChatBubble = memo(function ChatBubble({
   message, onRegenerate, onDelete, onEdit, onLike, onDislike, onShare,
   onImageClick, onImageRetry, onImageVariation, onImageEdit,
   isLast, selectedVoice = 0, onSpeak, isSpeaking,
@@ -53,6 +54,7 @@ export function ChatBubble({
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
   const [showMore, setShowMore] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const isUser = message.role === "user";
   const editRef = useRef<HTMLTextAreaElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
@@ -102,19 +104,21 @@ export function ChatBubble({
   const isImageMessage = message.type === "image" && message.imageUrl;
   const isGeneratingImage = message.type === "image" && message.status === "streaming" && !message.imageUrl;
   const isImageError = message.type === "image" && message.status === "error";
+  const isImageCancelled = message.type === "image" && message.status === "error" && message.content?.includes("cancelled");
 
   // === ACTION BUTTON COMPONENT ===
   const ActionBtn = ({ icon: Icon, label, onClick, active }: any) => (
-    <button
-      onClick={onClick}
-      className={cn("p-1.5 rounded-md hover:bg-white/5 transition-colors touch-target no-select",
-        active ? "text-primary" : "")}
-      style={!active ? { color: "var(--fg-muted)" } : {}}
-      aria-label={label}
-      title={label}
-    >
-      <Icon className="w-3.5 h-3.5" />
-    </button>
+    <Tooltip content={label} side="top">
+      <button
+        onClick={onClick}
+        className={cn("p-1.5 rounded-md hover:bg-white/5 transition-colors touch-target no-select",
+          active ? "text-primary" : "")}
+        style={!active ? { color: "var(--fg-muted)" } : {}}
+        aria-label={label}
+      >
+        <Icon className="w-3.5 h-3.5" />
+      </button>
+    </Tooltip>
   );
 
   // === IMAGE ACTIONS ===
@@ -192,6 +196,23 @@ export function ChatBubble({
               </div>
             </div>
           </div>
+        ) : isImageCancelled ? (
+          /* === IMAGE CANCELLED STATE === */
+          <div className="w-full max-w-sm">
+            <div className="rounded-2xl p-6 flex flex-col items-center gap-3"
+              style={{ border: "1px solid var(--input-border)", background: "var(--input-bg)" }}>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "var(--input-bg)" }}>
+                <Square className="w-5 h-5" style={{ color: "var(--fg-muted)" }} />
+              </div>
+              <p className="text-sm" style={{ color: "var(--fg)" }}>Image generation cancelled.</p>
+              {onImageRetry && (
+                <button onClick={onImageRetry}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-xs font-medium hover:opacity-90 transition-opacity touch-target">
+                  <RotateCcw className="w-3.5 h-3.5" /> Try Again
+                </button>
+              )}
+            </div>
+          </div>
         ) : isImageError ? (
           /* === IMAGE FAILED STATE === */
           <div className="w-full max-w-sm">
@@ -215,7 +236,17 @@ export function ChatBubble({
             )}
             <div className="relative rounded-xl overflow-hidden inline-block max-w-md group/img cursor-pointer"
               onClick={() => onImageClick?.(message.imageUrl!)}>
-              <img src={message.imageUrl} alt={message.imagePrompt || "Generated image"} className="rounded-xl max-w-full" loading="lazy" />
+              {!imgLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center skeleton-image"
+                  style={{ width: "320px", height: "320px" }}>
+                  <RefreshCw className="w-6 h-6 animate-spin" style={{ color: "var(--primary, #3b82f6)" }} />
+                </div>
+              )}
+              <img src={message.imageUrl} alt={message.imagePrompt || "Generated image"}
+                className="rounded-xl max-w-full transition-opacity duration-300"
+                style={{ opacity: imgLoaded ? 1 : 0 }}
+                onLoad={() => setImgLoaded(true)}
+                loading="lazy" />
               <div className="absolute top-2 right-2 p-2 rounded-lg bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Maximize2 className="w-4 h-4 text-white" />
               </div>
@@ -271,9 +302,10 @@ export function ChatBubble({
             {/* === MESSAGE ACTIONS === */}
             {!editing && message.status !== "streaming" && (
               <div className={cn(
-                "flex items-center gap-0.5 mt-1.5",
-                isUser ? "justify-end opacity-0 group-hover:opacity-100 md:opacity-0" : "justify-start",
-                "transition-opacity"
+                "flex items-center gap-0.5 mt-1.5 transition-opacity",
+                isUser
+                  ? "justify-end opacity-60 lg:opacity-0 lg:group-hover:opacity-100"
+                  : "justify-start opacity-60 lg:opacity-0 lg:group-hover:opacity-100"
               )}>
                 {/* Copy — always visible */}
                 <ActionBtn icon={copied ? Check : Copy} label="Copy" onClick={() => handleCopy(message.content)} />
@@ -310,12 +342,6 @@ export function ChatBubble({
                                 <Share2 className="w-3.5 h-3.5" /> Share
                               </button>
                             )}
-                            {onDelete && (
-                              <button onClick={() => { onDelete(); setShowMore(false); }}
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 flex items-center gap-2 text-red-400">
-                                <Trash2 className="w-3.5 h-3.5" /> Delete
-                              </button>
-                            )}
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -323,12 +349,9 @@ export function ChatBubble({
                   </>
                 )}
 
-                {/* User message actions */}
+                {/* User message actions — edit only, no delete (whole chats are deleted from the sidebar) */}
                 {isUser && onEdit && (
                   <ActionBtn icon={Pencil} label="Edit" onClick={() => setEditing(true)} />
-                )}
-                {isUser && onDelete && (
-                  <ActionBtn icon={Trash2} label="Delete" onClick={onDelete} />
                 )}
               </div>
             )}
@@ -337,4 +360,4 @@ export function ChatBubble({
       </div>
     </motion.div>
   );
-}
+});

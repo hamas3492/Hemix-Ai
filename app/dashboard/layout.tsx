@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { useChatStore } from "@/lib/store";
 import { Providers } from "@/components/Providers";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { MobileNav } from "@/components/dashboard/MobileNav";
@@ -22,7 +23,6 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [voiceMode, setVoiceMode] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -46,7 +46,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   if (!user) return null;
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg)" }}>
+    <div className="flex h-[100dvh] overflow-hidden" style={{ background: "var(--bg)" }}>
       {/* Desktop sidebar */}
       <Sidebar mobileOpen={mobileOpen} onMobileOpenChange={setMobileOpen} />
 
@@ -73,10 +73,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </main>
 
         {/* Mobile bottom navigation */}
-        <MobileNav
-          activePath={pathname}
-          onVoicePress={() => setVoiceMode(true)}
-        />
+        <MobileNav activePath={pathname} />
       </div>
     </div>
   );
