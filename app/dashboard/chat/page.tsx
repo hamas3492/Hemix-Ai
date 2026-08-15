@@ -124,13 +124,23 @@ function ChatPage() {
     if (!clean) return;
     const u = new SpeechSynthesisUtterance(clean);
     const voices = window.speechSynthesis.getVoices();
-    const preferredVoice =
-      voices.find(v => /google.*us.*english/i.test(v.name)) ||
-      voices.find(v => /google.*english/i.test(v.name)) ||
-      voices.find(v => /samantha|alex|daniel|karen|moira|tessa|fiona|serena|aaron|nicky/i.test(v.name)) ||
-      voices.find(v => v.lang === "en-US" && /natural|enhanced|premium/i.test(v.name)) ||
-      voices.find(v => v.lang === "en-US") ||
-      voices.find(v => v.lang.startsWith("en"));
+    // Detect Urdu text to pick the right voice
+    const isUrdu = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(clean);
+    const preferredVoice = isUrdu
+      ? voices.find(v => /google.*urdu/i.test(v.name)) ||
+        voices.find(v => v.lang === "ur-PK") ||
+        voices.find(v => v.lang === "ur") ||
+        voices.find(v => /google.*hindi/i.test(v.name)) ||
+        voices.find(v => v.lang === "hi-IN") ||
+        voices.find(v => /multilingual/i.test(v.name)) ||
+        voices.find(v => v.lang === "en-US") ||
+        voices.find(v => v.lang.startsWith("en"))
+      : voices.find(v => /google.*us.*english/i.test(v.name)) ||
+        voices.find(v => /google.*english/i.test(v.name)) ||
+        voices.find(v => /samantha|alex|daniel|karen|moira|tessa|fiona|serena|aaron|nicky/i.test(v.name)) ||
+        voices.find(v => v.lang === "en-US" && /natural|enhanced|premium/i.test(v.name)) ||
+        voices.find(v => v.lang === "en-US") ||
+        voices.find(v => v.lang.startsWith("en"));
     if (preferredVoice) u.voice = preferredVoice;
     u.onend = () => setSpeakingId(null);
     u.onerror = () => setSpeakingId(null);

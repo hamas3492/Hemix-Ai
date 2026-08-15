@@ -131,13 +131,24 @@ export function VoiceConversation({
     const utter = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
 
-    const preferredVoice =
-      voices.find(v => /google.*us.*english/i.test(v.name)) ||
-      voices.find(v => /google.*english/i.test(v.name)) ||
-      voices.find(v => /samantha|alex|daniel|karen|moira|tessa|fiona|serena|aaron|nicky/i.test(v.name)) ||
-      voices.find(v => v.lang === "en-US" && /natural|enhanced|premium/i.test(v.name)) ||
-      voices.find(v => v.lang === "en-US") ||
-      voices.find(v => v.lang.startsWith("en"));
+    // Detect if text is Urdu (Arabic/Urdu script) to pick the right voice
+    const isUrdu = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+
+    const preferredVoice = isUrdu
+      ? voices.find(v => /google.*urdu/i.test(v.name)) ||
+        voices.find(v => v.lang === "ur-PK") ||
+        voices.find(v => v.lang === "ur") ||
+        voices.find(v => /google.*hindi/i.test(v.name)) ||  // Hindi voice can handle Urdu script well
+        voices.find(v => v.lang === "hi-IN") ||
+        voices.find(v => /multilingual/i.test(v.name)) ||
+        voices.find(v => v.lang === "en-US") ||
+        voices.find(v => v.lang.startsWith("en"))
+      : voices.find(v => /google.*us.*english/i.test(v.name)) ||
+        voices.find(v => /google.*english/i.test(v.name)) ||
+        voices.find(v => /samantha|alex|daniel|karen|moira|tessa|fiona|serena|aaron|nicky/i.test(v.name)) ||
+        voices.find(v => v.lang === "en-US" && /natural|enhanced|premium/i.test(v.name)) ||
+        voices.find(v => v.lang === "en-US") ||
+        voices.find(v => v.lang.startsWith("en"));
 
     if (preferredVoice) utter.voice = preferredVoice;
     utter.rate = 1;
@@ -178,12 +189,12 @@ export function VoiceConversation({
         body: JSON.stringify({
           model: "hemix-1",
           messages: [
-            { role: "system", content: systemPromptRef.current },
+            { role: "system", content: systemPromptRef.current + "\n\nIMPORTANT: Detect the language the user speaks in. If the user speaks in Urdu or Roman Urdu, respond in Urdu (Urdu script). If the user speaks in English, respond in English. Always respond naturally in the same language the user used. Keep responses conversational and short for voice mode — 1-3 sentences max." },
             ...messagesRef.current.map(m => ({ role: m.role, content: m.content })),
             { role: "user", content: text },
           ],
           temperature: 0.7,
-          maxTokens: 4096, // Reduced from 16384 for faster responses
+          maxTokens: 2048, // Shorter for voice mode — faster responses
         }),
       });
 
@@ -265,7 +276,7 @@ export function VoiceConversation({
       const rec = new SR();
       rec.continuous = false; // Changed: non-continuous to prevent double recording
       rec.interimResults = true;
-      rec.lang = "en-US";
+      rec.lang = "ur-PK"; // Urdu — picks up Urdu + English loanwords naturally
 
       rec.onresult = (e: any) => {
         let text = "";
