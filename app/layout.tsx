@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { NativeInit } from "@/components/NativeInit";
+import { NetworkStatus } from "@/components/ui/NetworkStatus";
 
 export const metadata: Metadata = {
   title: "Hemix AI — Think Faster. Create Smarter.",
@@ -52,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: ANTI_FLASH_SCRIPT }} />
       </head>
       <body className="antialiased" style={{ background: "var(--bg)", color: "var(--fg)" }}>
-        <ThemeProvider><NativeInit />{children}</ThemeProvider>
+        <ThemeProvider><NativeInit /><NetworkStatus />{children}</ThemeProvider>
       </body>
     </html>
   );

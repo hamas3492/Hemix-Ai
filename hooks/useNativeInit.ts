@@ -11,6 +11,21 @@ import { useNativePlatform } from "./useNativePlatform";
  * - Sets safe area insets
  * - Configures keyboard behavior
  */
+/**
+ * Trigger haptic feedback on native platform (no-op on web).
+ * Call from button presses for better mobile UX.
+ */
+export async function hapticFeedback(style: "light" | "medium" | "heavy" = "light") {
+  try {
+    const cap = (window as any).Capacitor;
+    if (cap?.isNativePlatform?.()) {
+      const { Haptics, ImpactStyle } = await import("@capacitor/haptics");
+      const styleMap = { light: ImpactStyle.Light, medium: ImpactStyle.Medium, heavy: ImpactStyle.Heavy };
+      await Haptics.impact({ style: styleMap[style] });
+    }
+  } catch {}
+}
+
 export function useNativeInit() {
   const { isNative, platform } = useNativePlatform();
 

@@ -94,8 +94,21 @@ export function ImageViewer({ src, alt = "Image", onClose }: ImageViewerProps) {
 
   const handleMouseUp = () => setDragging(false);
 
+  const pinchStart = useRef({ dist: 0, zoom: 1 });
+
+  const getPinchDist = (t1: React.Touch, t2: React.Touch) => {
+    return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
+    if (e.touches.length === 2) {
+      // Pinch start — record initial distance and zoom
+      pinchStart.current = {
+        dist: getPinchDist(e.touches[0], e.touches[1]),
+        zoom: zoom,
+      };
+      setDragging(false);
+    } else if (e.touches.length === 1) {
       handleDoubleTap();
       if (zoom > 1) {
         setDragging(true);
@@ -105,7 +118,14 @@ export function ImageViewer({ src, alt = "Image", onClose }: ImageViewerProps) {
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 1 && dragging && zoom > 1) {
+    if (e.touches.length === 2 && pinchStart.current.dist > 0) {
+      // Pinch zoom
+      const newDist = getPinchDist(e.touches[0], e.touches[1]);
+      const scale = newDist / pinchStart.current.dist;
+      const newZoom = Math.max(1, Math.min(4, pinchStart.current.zoom * scale));
+      setZoom(newZoom);
+      if (newZoom === 1) setPan({ x: 0, y: 0 });
+    } else if (e.touches.length === 1 && dragging && zoom > 1) {
       setPan({
         x: dragStart.current.panX + (e.touches[0].clientX - dragStart.current.x),
         y: dragStart.current.panY + (e.touches[0].clientY - dragStart.current.y),
@@ -113,7 +133,10 @@ export function ImageViewer({ src, alt = "Image", onClose }: ImageViewerProps) {
     }
   };
 
-  const handleTouchEnd = () => setDragging(false);
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) pinchStart.current.dist = 0;
+    if (e.touches.length === 0) setDragging(false);
+  };
 
   const toolBtn = "p-2.5 rounded-xl glass-strong hover:bg-white/10 transition-colors touch-target no-select";
 
