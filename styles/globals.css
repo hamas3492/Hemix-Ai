@@ -450,3 +450,40 @@ html.light .gradient-border {
 html.light .chat-composer {
   background: var(--bg);
 }
+
+/* === NATIVE APP (Capacitor) === */
+body.native-app {
+  /* Safe area padding for notches and navigation bars */
+  --safe-area-top: env(safe-area-inset-top);
+  --safe-area-bottom: env(safe-area-inset-bottom);
+  --safe-area-left: env(safe-area-inset-left);
+  --safe-area-right: env(safe-area-inset-right);
+}
+
+/* Prevent text selection on UI elements in native app */
+body.native-app button,
+body.native-app [role="button"] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent pull-to-refresh in native app */
+body.native-app {
+  overscroll-behavior: none;
+}
+
+/* Smooth scrolling for native */
+body.native-app {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Disable text size adjustment */
+body.native-app {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Native app — hide browser-specific elements */
+body.native-app .web-only {
+  display: none !important;
+}

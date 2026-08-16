@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { NativeInit } from "@/components/NativeInit";
 
 export const metadata: Metadata = {
   title: "Hemix AI — Think Faster. Create Smarter.",
@@ -51,7 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: ANTI_FLASH_SCRIPT }} />
       </head>
       <body className="antialiased" style={{ background: "var(--bg)", color: "var(--fg)" }}>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider><NativeInit />{children}</ThemeProvider>
       </body>
     </html>
   );
