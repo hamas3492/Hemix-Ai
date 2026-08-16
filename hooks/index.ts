@@ -78,10 +78,26 @@ export function useKeyboardShortcut(
 
 export function useAutoScroll<T extends HTMLElement>(deps: unknown[]): React.RefObject<T> {
   const ref = useRef<T>(null);
+  const userScrolledUp = useRef(false);
+
+  // Track if user manually scrolled up
   useEffect(() => {
-    if (ref.current) {
-      ref.current.scrollTop = ref.current.scrollHeight;
-    }
+    const el = ref.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      userScrolledUp.current = !atBottom;
+    };
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || userScrolledUp.current) return;
+    // Smooth scroll on mobile, instant on desktop for performance
+    const isMobile = window.matchMedia("(max-width: 1024px)").matches;
+    el.scrollTo({ top: el.scrollHeight, behavior: isMobile ? "smooth" : "auto" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return ref;

@@ -188,6 +188,10 @@ function ChatPage() {
         updateMessage(convId, imgMessage.id, {
           content: "Image generation cancelled.", status: "error", type: "image",
         });
+      } else if (err instanceof TypeError && err.message.includes("fetch")) {
+        updateMessage(convId, imgMessage.id, {
+          content: "Unable to connect to Hemix. Please check your internet connection and try again.", status: "error", type: "image",
+        });
       } else {
         console.error("[chat] Image generation error:", err);
         updateMessage(convId, imgMessage.id, {
@@ -349,6 +353,12 @@ function ChatPage() {
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         updateMessage(convId!, assistantMessage.id, { status: "complete" });
+      } else if (err instanceof TypeError && err.message.includes("fetch")) {
+        // Network error — offline or server unreachable
+        updateMessage(convId!, assistantMessage.id, {
+          content: "Unable to connect to Hemix. Please check your internet connection and try again.",
+          status: "error",
+        });
       } else {
         updateMessage(convId!, assistantMessage.id, {
           content: "I'm having trouble connecting right now. Please try again in a moment.",
