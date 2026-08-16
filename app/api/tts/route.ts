@@ -16,7 +16,17 @@ export const maxDuration = 30;
  */
 export async function POST(req: NextRequest) {
   try {
-    const { text } = await req.json();
+    const { text, checkOnly } = await req.json();
+
+    // Quick availability check — don't waste an API call
+    if (checkOnly) {
+      const apiKey = process.env.ELEVENLABS_API_KEY;
+      const voiceId = process.env.ELEVENLABS_VOICE_ID;
+      if (!apiKey || !voiceId) {
+        return NextResponse.json({ available: false }, { status: 503 });
+      }
+      return NextResponse.json({ available: true });
+    }
 
     if (!text || typeof text !== "string") {
       return NextResponse.json({ error: "Text is required" }, { status: 400 });

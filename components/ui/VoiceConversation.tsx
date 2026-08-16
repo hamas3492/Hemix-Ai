@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,102 +24,20 @@ export function VoiceConversation({
   const recognitionRef = useRef<any>(null);
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMounted = useRef(true);
-  const isProcessing = useRef(false); // Prevents double recording/speaking
+  const isProcessing = useRef(false);
+  const isSpeaking = useRef(false); // Prevents double audio
   const messagesRef = useRef(messages);
   const systemPromptRef = useRef(systemPrompt);
   const mutedRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsAvailableRef = useRef<boolean | null>(null);
 
   // Keep refs in sync
   useEffect(() => { messagesRef.current = messages; }, [messages]);
   useEffect(() => { systemPromptRef.current = systemPrompt; }, [systemPrompt]);
   useEffect(() => { mutedRef.current = muted; }, [muted]);
 
-  // --- Speak function (uses custom TTS API with browser fallback) ---
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const ttsAvailableRef = useRef<boolean | null>(null); // null = not checked yet
-
-  const speakText = useCallback(async (text: string, onDone: () => void) => {
-    if (typeof window === "undefined") {
-      onDone();
-      return;
-    }
-
-    const clean = text.replace(/```[\s\S]*?```/g, " code block ").replace(/[*#`_>|]/g, "").trim();
-    if (!clean) { onDone(); return; }
-
-    // Cancel any existing speech/audio to prevent double audio
-    window.speechSynthesis?.cancel();
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-
-    let doneCalled = false;
-    const callDone = () => {
-      if (!doneCalled) { doneCalled = true; onDone(); }
-    };
-
-    setState("speaking");
-
-    // Check if custom TTS API is available (once per session)
-    if (ttsAvailableRef.current === null) {
-      try {
-        const check = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: "test" }),
-        });
-        ttsAvailableRef.current = check.ok;
-      } catch {
-        ttsAvailableRef.current = false;
-      }
-    }
-
-    // If custom TTS is available, use it (plays the user's cloned voice)
-    if (ttsAvailableRef.current) {
-      try {
-        const response = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        });
-
-        if (response.ok) {
-          const blob = await response.blob();
-          const audioUrl = URL.createObjectURL(blob);
-          const audio = new Audio(audioUrl);
-          audioRef.current = audio;
-
-          audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-            audioRef.current = null;
-            if (isMounted.current) callDone();
-            else callDone();
-          };
-          audio.onerror = () => {
-            URL.revokeObjectURL(audioUrl);
-            audioRef.current = null;
-            // Fall back to browser TTS on error
-            browserSpeak(clean, callDone);
-          };
-
-          await audio.play().catch(() => {
-            URL.revokeObjectURL(audioUrl);
-            audioRef.current = null;
-            browserSpeak(clean, callDone);
-          });
-          return;
-        } else {
-          // TTS not configured — fall back to browser
-          ttsAvailableRef.current = false;
-        }
-      } catch {
-        ttsAvailableRef.current = false;
-      }
-    }
-
-    // Browser TTS fallback
-    browserSpeak(clean, callDone);
-  }, []);
-
-  // Browser TTS helper (fallback when no custom TTS API)
+  // --- Browser TTS fallback ---
   const browserSpeak = useCallback((text: string, onDone: () => void) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       onDone();
@@ -131,14 +49,14 @@ export function VoiceConversation({
     const utter = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
 
-    // Detect if text is Urdu (Arabic/Urdu script) to pick the right voice
+    // Detect Urdu/Arabic script
     const isUrdu = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
 
     const preferredVoice = isUrdu
       ? voices.find(v => /google.*urdu/i.test(v.name)) ||
         voices.find(v => v.lang === "ur-PK") ||
         voices.find(v => v.lang === "ur") ||
-        voices.find(v => /google.*hindi/i.test(v.name)) ||  // Hindi voice can handle Urdu script well
+        voices.find(v => /google.*hindi/i.test(v.name)) ||
         voices.find(v => v.lang === "hi-IN") ||
         voices.find(v => /multilingual/i.test(v.name)) ||
         voices.find(v => v.lang === "en-US") ||
@@ -163,11 +81,104 @@ export function VoiceConversation({
     utter.onend = callDone;
     utter.onerror = callDone;
 
+    // Small delay to ensure cancel() finished
     setTimeout(() => {
-      if (isMounted.current) window.speechSynthesis.speak(utter);
-      else callDone();
-    }, 50);
+      if (isMounted.current && isSpeaking.current) {
+        window.speechSynthesis.speak(utter);
+      } else {
+        callDone();
+      }
+    }, 80);
   }, []);
+
+  // --- Speak function (uses custom TTS API with browser fallback) ---
+  const speakText = useCallback(async (text: string, onDone: () => void) => {
+    if (typeof window === "undefined") { onDone(); return; }
+
+    const clean = text.replace(/```[\s\S]*?```/g, " code block ").replace(/[*#`_>|]/g, "").trim();
+    if (!clean) { onDone(); return; }
+
+    // GUARD: Prevent double audio — only one speak at a time
+    if (isSpeaking.current) {
+      // Cancel previous and start fresh
+      window.speechSynthesis?.cancel();
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    }
+    isSpeaking.current = true;
+
+    let doneCalled = false;
+    const callDone = () => {
+      if (!doneCalled) {
+        doneCalled = true;
+        isSpeaking.current = false;
+        onDone();
+      }
+    };
+
+    setState("speaking");
+
+    // Check if custom TTS API is available (once per session)
+    if (ttsAvailableRef.current === null) {
+      try {
+        const check = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ checkOnly: true }),
+        });
+        ttsAvailableRef.current = check.ok;
+      } catch {
+        ttsAvailableRef.current = false;
+      }
+    }
+
+    if (!isSpeaking.current) { callDone(); return; } // Got interrupted during check
+
+    // If custom TTS is available, use it
+    if (ttsAvailableRef.current) {
+      try {
+        const response = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+
+        if (!isSpeaking.current) { callDone(); return; } // Interrupted
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const audioUrl = URL.createObjectURL(blob);
+          const audio = new Audio(audioUrl);
+          audioRef.current = audio;
+
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            audioRef.current = null;
+            callDone();
+          };
+          audio.onerror = () => {
+            URL.revokeObjectURL(audioUrl);
+            audioRef.current = null;
+            browserSpeak(clean, callDone);
+          };
+
+          await audio.play().catch(() => {
+            URL.revokeObjectURL(audioUrl);
+            audioRef.current = null;
+            browserSpeak(clean, callDone);
+          });
+          return;
+        } else {
+          ttsAvailableRef.current = false;
+        }
+      } catch {
+        ttsAvailableRef.current = false;
+      }
+    }
+
+    // Browser TTS fallback
+    if (!isSpeaking.current) { callDone(); return; }
+    browserSpeak(clean, callDone);
+  }, [browserSpeak]);
 
   // --- Handle user speech → API → AI speaks ---
   const handleUserStop = useCallback(async (text: string) => {
@@ -175,7 +186,7 @@ export function VoiceConversation({
 
     isProcessing.current = true;
 
-    // Stop recognition immediately
+    // Stop recognition immediately — no double recording
     try { recognitionRef.current?.stop(); } catch {}
     if (silenceTimer.current) { clearTimeout(silenceTimer.current); silenceTimer.current = null; }
 
@@ -189,48 +200,39 @@ export function VoiceConversation({
         body: JSON.stringify({
           model: "hemix-1",
           messages: [
-            { role: "system", content: systemPromptRef.current + "\n\nIMPORTANT: Detect the language the user speaks in. If the user speaks in Urdu or Roman Urdu, respond in Urdu (Urdu script). If the user speaks in English, respond in English. Always respond naturally in the same language the user used. Keep responses conversational and short for voice mode — 1-3 sentences max." },
+            { role: "system", content: systemPromptRef.current + "\n\nIMPORTANT: Detect the language the user speaks in. If the user speaks in Urdu or Roman Urdu, respond in Urdu (Urdu script). If the user speaks in English, respond in English. Always respond naturally in the same language the user used. Keep responses VERY short for voice mode — 1-3 sentences max. Be direct and concise." },
             ...messagesRef.current.map(m => ({ role: m.role, content: m.content })),
             { role: "user", content: text },
           ],
-          temperature: 0.7,
-          maxTokens: 2048, // Shorter for voice mode — faster responses
+          temperature: 0.5,
+          maxTokens: 500, // Much shorter for fast voice responses
         }),
       });
 
       if (!response.ok) throw new Error("API error");
 
-      // Read full response (non-streaming for speed in voice mode)
-      const data = await response.json().catch(() => null);
+      // Read SSE stream directly — no JSON parsing attempt (fixes empty response bug)
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No stream");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
       let fullText = "";
 
-      if (data) {
-        // Try JSON response first
-        fullText = data.choices?.[0]?.message?.content || data.content || "";
-      }
-
-      if (!fullText) {
-        // Fall back to streaming
-        const reader = response.body?.getReader();
-        if (reader) {
-          const decoder = new TextDecoder();
-          let buffer = "";
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || trimmed === "data: [DONE]" || !trimmed.startsWith("data: ")) continue;
-              try {
-                const d = JSON.parse(trimmed.slice(6));
-                const delta = d.choices?.[0]?.delta?.content;
-                if (delta) fullText += delta;
-              } catch { continue; }
-            }
-          }
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed === "data: [DONE]" || !trimmed.startsWith("data: ")) continue;
+          try {
+            const d = JSON.parse(trimmed.slice(6));
+            const delta = d.choices?.[0]?.delta?.content;
+            if (delta) fullText += delta;
+          } catch { continue; }
         }
       }
 
@@ -240,16 +242,23 @@ export function VoiceConversation({
         if (!mutedRef.current) {
           speakText(fullText, () => {
             if (!isMounted.current) return;
-            // After speaking, go back to listening
             isProcessing.current = false;
             setState("listening");
-            try { recognitionRef.current?.start(); } catch {}
+            // Small delay before restarting recognition
+            setTimeout(() => {
+              if (isMounted.current && !isProcessing.current) {
+                try { recognitionRef.current?.start(); } catch {}
+              }
+            }, 200);
           });
         } else {
-          // Muted — skip speaking, go back to listening
           isProcessing.current = false;
           setState("listening");
-          try { recognitionRef.current?.start(); } catch {}
+          setTimeout(() => {
+            if (isMounted.current && !isProcessing.current) {
+              try { recognitionRef.current?.start(); } catch {}
+            }
+          }, 200);
         }
       } else if (isMounted.current) {
         isProcessing.current = false;
@@ -263,9 +272,13 @@ export function VoiceConversation({
     }
   }, [onUserMessage, onAIResponse, speakText]);
 
-  // Keep handleUserStop in a ref so onresult always has the latest version
+  // Keep handleUserStop in a ref
   const handleUserStopRef = useRef(handleUserStop);
   useEffect(() => { handleUserStopRef.current = handleUserStop; }, [handleUserStop]);
+
+  // Keep state in a ref for onend handler
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   // --- Setup speech recognition (once) ---
   useEffect(() => {
@@ -274,9 +287,9 @@ export function VoiceConversation({
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SR) {
       const rec = new SR();
-      rec.continuous = false; // Changed: non-continuous to prevent double recording
+      rec.continuous = false; // Non-continuous — prevents double recording
       rec.interimResults = true;
-      rec.lang = "ur-PK"; // Urdu — picks up Urdu + English loanwords naturally
+      rec.lang = "ur-PK"; // Urdu — picks up Urdu + English
 
       rec.onresult = (e: any) => {
         let text = "";
@@ -284,13 +297,13 @@ export function VoiceConversation({
           text += e.results[i][0].transcript;
         }
 
-        // Clear and reset silence timer — 1.2s for faster response
+        // Reset silence timer — 1s for faster response
         if (silenceTimer.current) clearTimeout(silenceTimer.current);
         silenceTimer.current = setTimeout(() => {
           if (text.trim().length > 0 && !isProcessing.current) {
             handleUserStopRef.current(text.trim());
           }
-        }, 1200);
+        }, 1000);
       };
 
       rec.onerror = (e: any) => {
@@ -301,13 +314,10 @@ export function VoiceConversation({
       };
 
       rec.onend = () => {
-        // Don't auto-restart here — handleUserStop manages restart after speaking
-        // Only restart if we're still in listening state AND not processing
-        if (isMounted.current && !isProcessing.current) {
-          const currentState = stateRef.current;
-          if (currentState === "listening") {
-            try { rec.start(); } catch {}
-          }
+        // Only restart if in listening state AND not processing AND still mounted
+        // This prevents double recording
+        if (isMounted.current && !isProcessing.current && stateRef.current === "listening") {
+          try { rec.start(); } catch {}
         }
       };
 
@@ -318,22 +328,21 @@ export function VoiceConversation({
 
     return () => {
       isMounted.current = false;
+      isSpeaking.current = false;
       if (silenceTimer.current) clearTimeout(silenceTimer.current);
       try { recognitionRef.current?.abort(); } catch {}
       try { window.speechSynthesis?.cancel(); } catch {}
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     };
   }, []);
-
-  // Keep state in a ref for the onend handler
-  const stateRef = useRef(state);
-  useEffect(() => { stateRef.current = state; }, [state]);
 
   // --- Controls ---
   const startListening = useCallback(() => {
     if (!recognitionRef.current) { setState("error"); return; }
     isProcessing.current = false;
+    isSpeaking.current = false;
     setState("listening");
-    try { recognitionRef.current.start(); } catch {}
+    try { recognitionRef.current?.start(); } catch {}
   }, []);
 
   const stopListening = useCallback(() => {
@@ -344,8 +353,10 @@ export function VoiceConversation({
 
   const handleInterrupt = useCallback(() => {
     if (state === "speaking") {
+      // Stop all audio
       window.speechSynthesis?.cancel();
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+      isSpeaking.current = false;
       isProcessing.current = false;
       startListening();
     } else if (state === "listening") {
@@ -360,6 +371,7 @@ export function VoiceConversation({
     try { window.speechSynthesis?.cancel(); } catch {}
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     isProcessing.current = false;
+    isSpeaking.current = false;
     onClose();
   }, [onClose]);
 
@@ -378,7 +390,7 @@ export function VoiceConversation({
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[100] flex items-center justify-center p-0 lg:p-6"
-      style={{ background: "rgba(0,0,0,0.85)" }}
+      style={{ background: "rgba(0,0,0,0.92)" }}
     >
       <div
         className="relative flex flex-col items-center justify-between w-full h-full lg:max-w-2xl lg:max-h-[80vh] lg:rounded-3xl overflow-hidden"
@@ -414,7 +426,7 @@ export function VoiceConversation({
         </div>
       </div>
 
-      {/* === CENTER: VISUALIZER ONLY (no text/transcript) === */}
+      {/* === CENTER: VISUALIZER ONLY — no text/transcript === */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 w-full max-w-2xl">
         {/* Visualizer */}
         <div className="flex items-center justify-center gap-1.5 h-20 mb-4">
@@ -467,7 +479,7 @@ export function VoiceConversation({
           )}
         </div>
 
-        {/* State text only — no transcript */}
+        {/* State label only — no transcript */}
         <p className="text-center text-sm font-medium" style={{ color: "var(--fg-muted)" }}>
           {config.text}
         </p>
