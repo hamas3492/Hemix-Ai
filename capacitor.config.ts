@@ -8,7 +8,7 @@ const config: CapacitorConfig = {
   server: {
     // Load the deployed Hemix AI web app — all API calls go to this server
     // API keys remain server-side on Vercel, never exposed in the APK
-    url: "https://hemix-ai-woad.vercel.app",
+    url: "https://hemix-ai.vercel.app",
     cleartext: true,
   },
   android: {

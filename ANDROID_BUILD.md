@@ -6,7 +6,7 @@ The Hemix AI Android app is built using **Capacitor** — a native runtime that 
 
 ```
 Hemix Android App (Capacitor WebView)
-  → Loads https://hemix-ai-woad.vercel.app (existing web app)
+  → Loads https://hemix-ai.vercel.app (existing web app)
   → API calls → Vercel serverless backend (API keys stay server-side)
   → Auth → Supabase (same accounts as web)
   → Voice → Web Speech API + Capacitor microphone
