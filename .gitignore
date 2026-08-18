@@ -47,3 +47,5 @@ next-env.d.ts
 local.properties
 keystore.properties
 release-keystore.jks
+hemix-ai-app-v2.zip
+.github/workflows/
