@@ -1,4 +1,5 @@
 import { CapacitorConfig } from "@capacitor/cli";
+import { KeyboardResize } from "@capacitor/keyboard";
 
 const config: CapacitorConfig = {
   appId: "com.hemix.ai",
@@ -34,7 +35,10 @@ const config: CapacitorConfig = {
       backgroundColor: "#0a0a0a",
       overlaysWebView: false,
     },
-
+    Keyboard: {
+      resize: KeyboardResize.Native,
+      resizeOnFullScreen: true,
+    },
   },
 };
 

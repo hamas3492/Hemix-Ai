@@ -122,6 +122,7 @@ function ChatPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sendingRef = useRef(false); // synchronous guard against double-submit (fast double-tap / duplicate Enter events)
   const imageAbortRef = useRef<AbortController | null>(null);
   const { listening, supported: voiceSupported, start: startListening, stop: stopListening } = useVoiceInput();
   const messagesEndRef = useAutoScroll<HTMLDivElement>([conversations]);
@@ -282,6 +283,8 @@ function ChatPage() {
 
   const handleSend = useCallback(async () => {
     if ((!input.trim() && attachments.length === 0) || isGenerating || generatingImage) return;
+    if (sendingRef.current) return; // already processing a send — ignore duplicate trigger
+    sendingRef.current = true;
 
     let convId = activeConversationId;
     if (!activeConv) convId = createConversation("hemix-1");
@@ -300,8 +303,10 @@ function ChatPage() {
       attachmentData.push({ id: nanoid(), name: getDisplayFileName(file), type: file.type, size: file.size, url });
     }
 
-    const messageText = input.trim() || (attachments.length > 0 ? "Please review the attached file(s)." : "");
-    if (!messageText) return;
+    const messageText = input.trim();
+    // Allow sending with just an attachment and no caption text — don't force
+    // a fake "Please review the attached file(s)." caption onto the message.
+    if (!messageText && attachmentData.length === 0) { sendingRef.current = false; return; }
 
     const userMessage: Message = {
       id: nanoid(), role: "user", content: messageText,
@@ -320,12 +325,14 @@ function ChatPage() {
     if (editingImagePrompt && !hasAttachments) {
       await handleImageGenerate(currentInput, convId!, true, editingImagePrompt);
       setEditingImagePrompt(null);
+      sendingRef.current = false;
       return;
     }
 
     // === AUTO-DETECT IMAGE REQUEST ===
     if (!hasAttachments && isImageRequest(currentInput)) {
       await handleImageGenerate(currentInput, convId!);
+      sendingRef.current = false;
       return;
     }
 
@@ -333,6 +340,7 @@ function ChatPage() {
     const lastImageMsg = [...(activeConv?.messages || [])].reverse().find(m => m.type === "image" && m.imageUrl);
     if (!hasAttachments && lastImageMsg && isImageEditRequest(currentInput)) {
       await handleImageGenerate(currentInput, convId!, true, lastImageMsg.imagePrompt);
+      sendingRef.current = false;
       return;
     }
 
@@ -345,16 +353,22 @@ function ChatPage() {
     setGenerating(true);
     abortRef.current = new AbortController();
 
-    const sysPrompt = getSystemPrompt(chatSettings, activeConv?.personality);
+    // If the user attached an image but typed no caption, don't put words in
+    // their mouth — instruct the assistant to ask what they'd like done with it.
+    const noCaptionWithImage = !currentInput.trim() && attachmentData.some((a) => a.type.startsWith("image/"));
+    const imageOnlyInstruction = "\n\n[The user sent this image with no caption/instructions. Briefly ask what they'd like you to do with it (e.g. describe it, extract text, edit it, identify something) — don't assume.]";
+
+    const sysPrompt = getSystemPrompt(chatSettings, activeConv?.personality) + (noCaptionWithImage ? imageOnlyInstruction : "");
     const textContent = fileContents.length > 0 ? `${currentInput}\n\n${fileContents.join("\n\n")}` : currentInput;
 
     // Collect image URLs from the current attachments (data URLs) for vision input
     const imageUrls = attachmentData.filter((a) => a.url && a.type.startsWith("image/")).map((a) => a.url!);
 
-    // Build the current user message content — multimodal if images are attached
+    // Build the current user message content — multimodal if images are attached.
+    // When there's no text, only send the image part(s) — no fake caption text.
     const userContent: any = imageUrls.length > 0
       ? [
-          { type: "text", text: textContent },
+          ...(textContent.trim() ? [{ type: "text", text: textContent }] : []),
           ...imageUrls.map((url) => ({ type: "image_url", image_url: { url } })),
         ]
       : textContent;
@@ -441,6 +455,7 @@ function ChatPage() {
     } finally {
       setGenerating(false);
       abortRef.current = null;
+      sendingRef.current = false;
     }
   }, [input, attachments, isGenerating, generatingImage, activeConv, activeConversationId, createConversation, addMessage, updateMessage, setGenerating, chatSettings, handleImageGenerate, editingImagePrompt]);
 

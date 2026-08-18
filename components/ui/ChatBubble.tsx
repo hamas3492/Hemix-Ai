@@ -291,10 +291,12 @@ export const ChatBubble = memo(function ChatBubble({
               </div>
             )}
             {isUser ? (
-              <div className="rounded-2xl px-4 py-2.5 text-sm"
-                style={{ background: "transparent", border: "1px solid var(--input-border)", color: "var(--fg)" }}>
-                <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
-              </div>
+              message.content.trim() ? (
+                <div className="rounded-2xl px-4 py-2.5 text-sm"
+                  style={{ background: "transparent", border: "1px solid var(--input-border)", color: "var(--fg)" }}>
+                  <p className="whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
+                </div>
+              ) : null
             ) : (
               <div className="markdown-body py-1">
                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
