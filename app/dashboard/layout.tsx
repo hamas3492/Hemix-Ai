@@ -68,7 +68,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main content area */}
-        <main className="flex-1 overflow-hidden min-w-0 pb-[60px] lg:pb-0">
+        <main className="flex-1 overflow-hidden min-w-0 pb-[52px] lg:pb-0">
           {children}
         </main>
 

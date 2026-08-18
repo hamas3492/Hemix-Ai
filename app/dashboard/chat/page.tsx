@@ -499,7 +499,7 @@ function ChatPage() {
       </div>
 
       {/* === COMPOSER — ChatGPT-style unified bar === */}
-      <div className="border-t px-3 sm:px-4 py-3 sm:py-4 backdrop-blur-xl shrink-0 chat-composer safe-bottom"
+      <div className="border-t px-3 sm:px-4 py-3 sm:py-4 backdrop-blur-xl shrink-0 chat-composer"
         style={{ borderColor: 'var(--glass-border)', background: 'var(--bg)' }}>
         <div className="max-w-3xl mx-auto">
           {/* Editing image indicator */}

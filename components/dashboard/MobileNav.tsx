@@ -20,10 +20,10 @@ export function MobileNav({ activePath }: MobileNavProps) {
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t"
       style={{ borderColor: "var(--glass-border)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-      <div className="flex items-center justify-center h-[52px]">
+      <div className="flex items-center justify-center h-[48px]">
         <Link href="/dashboard/chat"
           className={cn(
-            "flex flex-col items-center justify-center gap-0.5 h-full px-8 touch-target no-select transition-colors",
+            "flex items-center justify-center h-full px-8 touch-target no-select transition-colors",
           )}
           style={{ color: isActive ? "var(--primary, #3b82f6)" : "var(--fg-muted)" }}>
           {isActive && (
@@ -32,7 +32,6 @@ export function MobileNav({ activePath }: MobileNavProps) {
               style={{ background: "var(--primary, #3b82f6)" }} />
           )}
           <MessageSquare className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Chat</span>
         </Link>
       </div>
     </nav>
