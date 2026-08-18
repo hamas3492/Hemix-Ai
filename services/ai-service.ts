@@ -1,8 +1,17 @@
 import type { AIModel, ModelProvider } from "@/types";
 
+// Content can be a plain string, or a multimodal array (OpenAI vision format)
+// for messages that include image attachments.
+export type MessageContent =
+  | string
+  | Array<
+      | { type: "text"; text: string }
+      | { type: "image_url"; image_url: { url: string } }
+    >;
+
 export interface ChatRequest {
   model: string;
-  messages: { role: string; content: string }[];
+  messages: { role: string; content: MessageContent }[];
   temperature?: number;
   maxTokens?: number;
   topP?: number;

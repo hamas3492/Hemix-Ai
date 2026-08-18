@@ -85,6 +85,24 @@ async function fileToDataURL(file: File): Promise<string> {
   });
 }
 
+// Android's content picker / camera often returns ugly generated filenames
+// (long numeric strings like "17870379647379...jpg"). Clean these up to a
+// friendly, readable label based on the file's mime type.
+function getDisplayFileName(file: File): string {
+  const name = file.name || "";
+  const extMatch = name.match(/\.([a-zA-Z0-9]+)$/);
+  const ext = extMatch ? extMatch[1] : (file.type.split("/")[1] || "file");
+  const base = name.replace(/\.[a-zA-Z0-9]+$/, "");
+  // If the name (minus extension) is long and purely numeric, it's a generated name
+  const isGenerated = /^\d{6,}$/.test(base) || base.length > 40;
+  if (isGenerated) {
+    if (file.type.startsWith("image/")) return `Image.${ext}`;
+    if (file.type === "application/pdf") return `Document.${ext}`;
+    return `File.${ext}`;
+  }
+  return name;
+}
+
 function ChatPage() {
   const searchParams = useSearchParams();
   const conversationId = searchParams.get("c");
@@ -279,7 +297,7 @@ function ChatPage() {
       if (file.type.startsWith("image/")) {
         url = await fileToDataURL(file);
       }
-      attachmentData.push({ id: nanoid(), name: file.name, type: file.type, size: file.size, url });
+      attachmentData.push({ id: nanoid(), name: getDisplayFileName(file), type: file.type, size: file.size, url });
     }
 
     const messageText = input.trim() || (attachments.length > 0 ? "Please review the attached file(s)." : "");
@@ -294,22 +312,26 @@ function ChatPage() {
     const currentInput = messageText;
     setInput(""); setAttachments([]);
 
+    // If the user attached files, skip the image-generation auto-detection —
+    // they want the attached file(s) reviewed/analyzed, not a new image generated.
+    const hasAttachments = attachmentData.length > 0;
+
     // === EXPLICIT IMAGE EDIT (from Edit button) ===
-    if (editingImagePrompt) {
+    if (editingImagePrompt && !hasAttachments) {
       await handleImageGenerate(currentInput, convId!, true, editingImagePrompt);
       setEditingImagePrompt(null);
       return;
     }
 
     // === AUTO-DETECT IMAGE REQUEST ===
-    if (isImageRequest(currentInput)) {
+    if (!hasAttachments && isImageRequest(currentInput)) {
       await handleImageGenerate(currentInput, convId!);
       return;
     }
 
     // === AUTO-DETECT IMAGE EDIT ===
     const lastImageMsg = [...(activeConv?.messages || [])].reverse().find(m => m.type === "image" && m.imageUrl);
-    if (lastImageMsg && isImageEditRequest(currentInput)) {
+    if (!hasAttachments && lastImageMsg && isImageEditRequest(currentInput)) {
       await handleImageGenerate(currentInput, convId!, true, lastImageMsg.imagePrompt);
       return;
     }
@@ -324,7 +346,34 @@ function ChatPage() {
     abortRef.current = new AbortController();
 
     const sysPrompt = getSystemPrompt(chatSettings, activeConv?.personality);
-    const userContent = fileContents.length > 0 ? `${currentInput}\n\n${fileContents.join("\n\n")}` : currentInput;
+    const textContent = fileContents.length > 0 ? `${currentInput}\n\n${fileContents.join("\n\n")}` : currentInput;
+
+    // Collect image URLs from the current attachments (data URLs) for vision input
+    const imageUrls = attachmentData.filter((a) => a.url && a.type.startsWith("image/")).map((a) => a.url!);
+
+    // Build the current user message content — multimodal if images are attached
+    const userContent: any = imageUrls.length > 0
+      ? [
+          { type: "text", text: textContent },
+          ...imageUrls.map((url) => ({ type: "image_url", image_url: { url } })),
+        ]
+      : textContent;
+
+    // Build history — include past image attachments as multimodal content too,
+    // so the model can reference images from earlier in the conversation.
+    const historyMessages = (activeConv?.messages || []).map((m) => {
+      const pastImages = (m.attachments || []).filter((a) => a.url && a.type.startsWith("image/")).map((a) => a.url!);
+      if (pastImages.length > 0) {
+        return {
+          role: m.role,
+          content: [
+            { type: "text", text: m.content },
+            ...pastImages.map((url) => ({ type: "image_url", image_url: { url } })),
+          ],
+        };
+      }
+      return { role: m.role, content: m.content };
+    });
 
     try {
       const response = await fetch("/api/chat", {
@@ -335,7 +384,7 @@ function ChatPage() {
           model: activeConv?.model || "hemix-1",
           messages: [
             { role: "system", content: sysPrompt },
-            ...(activeConv?.messages || []).map((m) => ({ role: m.role, content: m.content })),
+            ...historyMessages,
             { role: "user", content: userContent },
           ],
           temperature: chatSettings.temperature ?? 0.7,
@@ -486,7 +535,7 @@ function ChatPage() {
       </div>
 
       {/* === MESSAGES === */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 min-h-0 chat-scroll relative"
+      <div ref={messagesEndRef} className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 min-h-0 chat-scroll relative"
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         style={{ backgroundImage: "radial-gradient(rgba(139,92,246,0.06) 1px, transparent 1px)", backgroundSize: "22px 22px" }}>
@@ -518,7 +567,6 @@ function ChatPage() {
               isSpeaking={speakingId === msg.id}
             />
           ))}
-          <div ref={messagesEndRef} />
         </div>
       </div>
 
@@ -546,7 +594,7 @@ function ChatPage() {
                 <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg border"
                   style={{ background: 'var(--input-bg)', borderColor: 'var(--input-border)' }}>
                   <Paperclip className="w-3 h-3" style={{ color: "var(--fg-muted)" }} />
-                  <span className="text-xs truncate max-w-[120px] sm:max-w-[150px]" style={{ color: "var(--fg)" }}>{file.name}</span>
+                  <span className="text-xs truncate max-w-[120px] sm:max-w-[150px]" style={{ color: "var(--fg)" }}>{getDisplayFileName(file)}</span>
                   <button onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
                     className="touch-target" style={{ color: "var(--fg-muted)" }}>
                     <X className="w-3 h-3" />
