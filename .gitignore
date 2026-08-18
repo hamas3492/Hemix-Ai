@@ -47,5 +47,6 @@ next-env.d.ts
 local.properties
 keystore.properties
 release-keystore.jks
-hemix-ai-app-v2.zip
+hemix-ai-app*.zip
+hemix-ai-debug*.apk
 .github/workflows/
