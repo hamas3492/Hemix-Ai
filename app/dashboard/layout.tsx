@@ -7,7 +7,6 @@ import { useAuth } from "@/lib/auth-context";
 import { useChatStore } from "@/lib/store";
 import { Providers } from "@/components/Providers";
 import { Sidebar } from "@/components/dashboard/Sidebar";
-import { MobileNav } from "@/components/dashboard/MobileNav";
 import { Spinner } from "@/components/ui/Spinner";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -68,12 +67,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main content area */}
-        <main className="flex-1 overflow-hidden min-w-0 pb-[52px] lg:pb-0">
+        <main className="flex-1 overflow-hidden min-w-0 ">
           {children}
         </main>
 
         {/* Mobile bottom navigation */}
-        <MobileNav activePath={pathname} />
       </div>
     </div>
   );
