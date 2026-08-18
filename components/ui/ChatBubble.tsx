@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Copy, Check, RotateCcw, Pencil, Volume2, Pause, Download,
   ThumbsUp, ThumbsDown, Share2, MoreHorizontal, Maximize2, Wand2,
-  Image as ImageIcon, AlertCircle, RefreshCw, Square,
+  Image as ImageIcon, AlertCircle, RefreshCw, Square, FileText, Paperclip,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -258,6 +258,38 @@ export const ChatBubble = memo(function ChatBubble({
         ) : (
           /* === TEXT MESSAGE === */
           <>
+            {/* === ATTACHMENTS (shown above message text, like ChatGPT) === */}
+            {isUser && message.attachments && message.attachments.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-1.5 justify-end">
+                {message.attachments.map((att) => {
+                  const isImage = att.type.startsWith("image/");
+                  const fileSize = att.size > 1024 * 1024
+                    ? (att.size / (1024 * 1024)).toFixed(1) + " MB"
+                    : att.size > 1024
+                      ? (att.size / 1024).toFixed(0) + " KB"
+                      : att.size + " B";
+                  return (
+                    <div key={att.id}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl border max-w-[280px]"
+                      style={{ background: "var(--input-bg)", borderColor: "var(--input-border)" }}>
+                      {isImage && att.url ? (
+                        <img src={att.url} alt={att.name}
+                          className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ background: "var(--input-bg)" }}>
+                          <FileText className="w-4.5 h-4.5" style={{ color: "var(--fg-muted)" }} />
+                        </div>
+                      )}
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-medium truncate" style={{ color: "var(--fg)" }}>{att.name}</span>
+                        <span className="text-[10px]" style={{ color: "var(--fg-muted)" }}>{fileSize}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {isUser ? (
               <div className="rounded-2xl px-4 py-2.5 text-sm"
                 style={{ background: "transparent", border: "1px solid var(--input-border)", color: "var(--fg)" }}>

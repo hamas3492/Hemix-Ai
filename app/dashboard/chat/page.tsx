@@ -65,8 +65,24 @@ async function readFileContent(file: File): Promise<string | null> {
   const textTypes = ["text/", "application/json", "application/xml", "application/javascript", "application/typescript"];
   const textExtensions = [".txt", ".md", ".json", ".xml", ".js", ".ts", ".tsx", ".jsx", ".py", ".java", ".c", ".cpp", ".html", ".css", ".scss", ".yml", ".yaml", ".sh", ".sql", ".csv", ".env", ".gitignore"];
   const isText = textTypes.some((t) => file.type.startsWith(t)) || textExtensions.some((ext) => file.name.toLowerCase().endsWith(ext));
-  if (isText && file.size < 100000) return await file.text();
+  if (isText && file.size < 200000) return await file.text();
+  // For PDFs, read as base64 (limited size)
+  if (file.type === "application/pdf" && file.size < 500000) {
+    const buffer = await file.arrayBuffer();
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+    return `[File: ${file.name} (PDF, base64)]\n${base64}`;
+  }
   return null;
+}
+
+// Convert image file to base64 data URL for display in chat
+async function fileToDataURL(file: File): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
 }
 
 function ChatPage() {
@@ -253,9 +269,17 @@ function ChatPage() {
     if (!activeConv) convId = createConversation("hemix-1");
 
     let fileContents: string[] = [];
+    const attachmentData: Array<{ id: string; name: string; type: string; size: number; url?: string }> = [];
+
     for (const file of attachments) {
-      const content = await readFileContent(file);
-      if (content) fileContents.push(`[File: ${file.name}]\n${content}`);
+      const fileContent = await readFileContent(file);
+      if (fileContent) fileContents.push(`[File: ${file.name}]\n${fileContent}`);
+      // For image files, convert to data URL so they display in the chat
+      let url: string | undefined;
+      if (file.type.startsWith("image/")) {
+        url = await fileToDataURL(file);
+      }
+      attachmentData.push({ id: nanoid(), name: file.name, type: file.type, size: file.size, url });
     }
 
     const messageText = input.trim() || (attachments.length > 0 ? "Please review the attached file(s)." : "");
@@ -264,7 +288,7 @@ function ChatPage() {
     const userMessage: Message = {
       id: nanoid(), role: "user", content: messageText,
       createdAt: new Date().toISOString(),
-      attachments: attachments.map((f) => ({ id: nanoid(), name: f.name, type: f.type, size: f.size })),
+      attachments: attachmentData,
     };
     addMessage(convId!, userMessage);
     const currentInput = messageText;

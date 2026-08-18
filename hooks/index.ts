@@ -85,7 +85,7 @@ export function useAutoScroll<T extends HTMLElement>(deps: unknown[]): React.Ref
     const el = ref.current;
     if (!el) return;
     const handleScroll = () => {
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
       userScrolledUp.current = !atBottom;
     };
     el.addEventListener("scroll", handleScroll, { passive: true });
@@ -95,9 +95,16 @@ export function useAutoScroll<T extends HTMLElement>(deps: unknown[]): React.Ref
   useEffect(() => {
     const el = ref.current;
     if (!el || userScrolledUp.current) return;
-    // Smooth scroll on mobile, instant on desktop for performance
-    const isMobile = window.matchMedia("(max-width: 1024px)").matches;
-    el.scrollTo({ top: el.scrollHeight, behavior: isMobile ? "smooth" : "auto" });
+
+    // Use double rAF to ensure DOM has fully painted with new content
+    // before scrolling. This fixes auto-scroll during streaming.
+    const raf = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!ref.current || userScrolledUp.current) return;
+        ref.current.scrollTo({ top: ref.current.scrollHeight, behavior: "auto" });
+      });
+    });
+    return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return ref;
