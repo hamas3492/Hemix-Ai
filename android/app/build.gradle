@@ -3,29 +3,67 @@ apply plugin: 'com.android.application'
 android {
     namespace "com.hemix.ai"
     compileSdk rootProject.ext.compileSdkVersion
+
     defaultConfig {
         applicationId "com.hemix.ai"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 5
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    buildTypes {
+
+    // === Signing configuration for release builds ===
+    // The keystore is loaded from a path specified in the project-level
+    // gradle.properties (or environment variables). For local development
+    // and testing, we fall back to the debug keystore.
+    signingConfigs {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            def ksFile = file(System.env.HEMIX_KEYSTORE_PATH ?: 'hemix-release.keystore')
+            def ksPass = System.env.HEMIX_KEYSTORE_PASSWORD ?: 'hemixai'
+            def ksAlias = System.env.HEMIX_KEY_ALIAS ?: 'hemix'
+            def ksKeyPass = System.env.HEMIX_KEY_PASSWORD ?: 'hemixai'
+            if (ksFile.exists()) {
+                storeFile ksFile
+                storePassword ksPass
+                keyAlias ksAlias
+                keyPassword ksKeyPass
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            // Keep same applicationId as release for consistent testing
+        }
+        release {
+            // Use release signing if keystore exists, otherwise debug sign
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    // Enable AAB (Android App Bundle) for Play Store
+    bundle {
+        language {
+            enableSplit = true
+        }
+        density {
+            enableSplit = true
+        }
+        abi {
+            enableSplit = true
         }
     }
 }
 
 repositories {
-    flatDir{
+    flatDir {
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
     }
 }
