@@ -3,21 +3,26 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, User, Mail, Lock, ArrowRight, ArrowLeft, RefreshCw, AlertCircle, ShieldCheck } from "lucide-react";
+import { User, Mail, Lock, ArrowRight, ArrowLeft, RefreshCw, AlertCircle, ShieldCheck, Phone } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { OtpInput } from "@/components/auth/OtpInput";
+import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { useAuth } from "@/lib/auth-context";
 import { showError, showSuccess } from "@/components/ui/Toast";
 
+type SignupMode = "email" | "phone";
+
 export default function SignupPage() {
   const router = useRouter();
-  const { signup, verifyOTP } = useAuth();
+  const { signup, verifyOTP, signupWithPhoneOTP, verifyPhoneOTP } = useAuth();
 
+  const [mode, setMode] = useState<SignupMode>("email");
   const [step, setStep] = useState<1 | 2>(1);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -45,6 +50,13 @@ export default function SignupPage() {
     };
   }, [step, resendTimer]);
 
+  // Reset step when switching mode
+  useEffect(() => {
+    setStep(1);
+    setOtp("");
+    setErrorMsg(null);
+  }, [mode]);
+
   const handleStep1Submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -65,7 +77,6 @@ export default function SignupPage() {
     setLoading(true);
     try {
       const result = await signup(name.trim(), email.trim(), password);
-      // If session is returned, email auto-confirmed — skip OTP step
       if (result?.session) {
         showSuccess(`Welcome to Hemix AI, ${name.trim()}!`);
         router.push("/dashboard/chat");
@@ -84,7 +95,39 @@ export default function SignupPage() {
     }
   };
 
-  const handleVerify = async (codeToVerify?: string) => {
+  // === Phone signup ===
+  const handlePhoneStep1Submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    if (!name.trim()) {
+      setErrorMsg("Please enter your name.");
+      return;
+    }
+    if (!phone.trim()) {
+      setErrorMsg("Please enter your phone number.");
+      return;
+    }
+
+    const normalizedPhone = phone.trim().startsWith("+") ? phone.trim() : `+${phone.trim()}`;
+
+    setLoading(true);
+    try {
+      await signupWithPhoneOTP(normalizedPhone);
+      showSuccess("Verification code sent to your phone!");
+      setStep(2);
+      setResendTimer(60);
+      setCanResend(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Signup failed. Please try again.";
+      setErrorMsg(message);
+      showError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyEmail = async (codeToVerify?: string) => {
     const code = codeToVerify || otp;
     if (code.length !== 6) {
       setErrorMsg("Please enter a valid 6-digit verification code.");
@@ -107,13 +150,45 @@ export default function SignupPage() {
     }
   };
 
+  const handleVerifyPhone = async (codeToVerify?: string) => {
+    const code = codeToVerify || otp;
+    if (code.length !== 6) {
+      setErrorMsg("Please enter a valid 6-digit verification code.");
+      return;
+    }
+
+    const normalizedPhone = phone.trim().startsWith("+") ? phone.trim() : `+${phone.trim()}`;
+
+    setErrorMsg(null);
+    setLoading(true);
+
+    try {
+      const user = await verifyPhoneOTP(normalizedPhone, code);
+      showSuccess(`Welcome to Hemix AI, ${user.name || "friend"}!`);
+      router.push("/dashboard/chat");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Invalid verification code.";
+      setErrorMsg(message);
+      showError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify = mode === "phone" ? handleVerifyPhone : handleVerifyEmail;
+
   const handleResendOTP = async () => {
     if (!canResend || loading) return;
     setErrorMsg(null);
     setLoading(true);
 
     try {
-      await signup(name.trim(), email.trim(), password);
+      if (mode === "phone") {
+        const normalizedPhone = phone.trim().startsWith("+") ? phone.trim() : `+${phone.trim()}`;
+        await signupWithPhoneOTP(normalizedPhone);
+      } else {
+        await signup(name.trim(), email.trim(), password);
+      }
       showSuccess("A new verification code has been sent!");
       setResendTimer(60);
       setCanResend(false);
@@ -125,6 +200,8 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
+
+  const targetLabel = mode === "phone" ? phone : email;
 
   return (
     <motion.div
@@ -143,14 +220,58 @@ export default function SignupPage() {
             <span className="text-xl font-bold text-white">Hemix AI</span>
           </a>
           <h1 className="text-2xl font-bold text-white mb-1">
-            {step === 1 ? "Create account" : "Verify your email"}
+            {step === 1 ? "Create account" : "Verify your account"}
           </h1>
           <p className="text-sm text-muted">
             {step === 1
               ? "Start your free trial — no credit card required"
-              : `We sent a 6-digit code to ${email}`}
+              : `We sent a 6-digit code to ${targetLabel}`}
           </p>
         </div>
+
+        {/* Google Sign-In (only on step 1) */}
+        {step === 1 && (
+          <>
+            <div className="mb-5">
+              <GoogleAuthButton label="Sign up with Google" />
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-xs text-muted font-medium">or sign up with</span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+
+            {/* Mode Switcher */}
+            <div className="flex p-1 rounded-xl bg-white/5 border border-white/10 mb-6 gap-1">
+              <button
+                type="button"
+                onClick={() => setMode("email")}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  mode === "email"
+                    ? "bg-primary text-white shadow-md"
+                    : "text-muted hover:text-white"
+                }`}
+              >
+                <Mail className="w-3.5 h-3.5" />
+                Email
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("phone")}
+                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  mode === "phone"
+                    ? "bg-primary text-white shadow-md"
+                    : "text-muted hover:text-white"
+                }`}
+              >
+                <Phone className="w-3.5 h-3.5" />
+                Phone
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Error Message Box */}
         {errorMsg && (
@@ -168,12 +289,12 @@ export default function SignupPage() {
         <AnimatePresence mode="wait">
           {step === 1 ? (
             <motion.form
-              key="step1"
+              key={`step1-${mode}`}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               transition={{ duration: 0.3 }}
-              onSubmit={handleStep1Submit}
+              onSubmit={mode === "phone" ? handlePhoneStep1Submit : handleStep1Submit}
               className="space-y-4"
             >
               <div className="relative">
@@ -191,35 +312,54 @@ export default function SignupPage() {
                 />
               </div>
 
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted z-10" />
-                <Input
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (errorMsg) setErrorMsg(null);
-                  }}
-                  className="pl-11"
-                  required
-                />
-              </div>
+              {mode === "email" ? (
+                <>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted z-10" />
+                    <Input
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (errorMsg) setErrorMsg(null);
+                      }}
+                      className="pl-11"
+                      required
+                    />
+                  </div>
 
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted z-10" />
-                <Input
-                  type="password"
-                  placeholder="Create password (min 6 characters)"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    if (errorMsg) setErrorMsg(null);
-                  }}
-                  className="pl-11"
-                  required
-                />
-              </div>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted z-10" />
+                    <Input
+                      type="password"
+                      placeholder="Create password (min 6 characters)"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (errorMsg) setErrorMsg(null);
+                      }}
+                      className="pl-11"
+                      required
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted z-10" />
+                  <Input
+                    type="tel"
+                    placeholder="+92 300 1234567"
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (errorMsg) setErrorMsg(null);
+                    }}
+                    className="pl-11"
+                    required
+                  />
+                </div>
+              )}
 
               <Button type="submit" className="w-full" size="lg" loading={loading}>
                 Continue

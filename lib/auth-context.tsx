@@ -16,6 +16,10 @@ interface AuthContextType {
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateProfile: (updates: Partial<Pick<User, "name" | "avatar">>) => Promise<User | null>;
+  loginWithPhoneOTP: (phone: string) => Promise<void>;
+  signupWithPhoneOTP: (phone: string) => Promise<void>;
+  verifyPhoneOTP: (phone: string, token: string) => Promise<User>;
+  signInWithGoogle: (redirectTo: string, skipRedirect?: boolean) => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -143,6 +147,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loginWithPhoneOTP = async (phone: string) => {
+    setLoading(true);
+    try {
+      await authService.loginWithPhoneOTP(phone);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signupWithPhoneOTP = async (phone: string) => {
+    setLoading(true);
+    try {
+      await authService.signupWithPhoneOTP(phone);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyPhoneOTP = async (phone: string, token: string) => {
+    setLoading(true);
+    try {
+      const u = await authService.verifyPhoneOTP(phone, token);
+      setUser(u);
+      setStoreUser(u);
+      return u;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signInWithGoogle = async (redirectTo: string, skipRedirect = false) => {
+    return authService.signInWithGoogle(redirectTo, skipRedirect);
+  };
+
   const updateProfile = async (updates: Partial<Pick<User, "name" | "avatar">>) => {
     const updated = await authService.updateProfile(updates);
     if (updated) {
@@ -165,6 +203,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         resetPassword,
         updateProfile,
+        loginWithPhoneOTP,
+        signupWithPhoneOTP,
+        verifyPhoneOTP,
+        signInWithGoogle,
       }}
     >
       {children}

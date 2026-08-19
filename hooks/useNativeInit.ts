@@ -64,6 +64,23 @@ export function useNativeInit() {
           }
         });
 
+        // === OAUTH DEEP LINK (Google sign-in callback) ===
+        // When the in-app browser finishes the Google consent flow, it
+        // redirects to com.hemix.ai://auth/callback#access_token=...
+        // Android hands that URL back to us here.
+        App.addListener("appUrlOpen", async ({ url }) => {
+          if (!url.startsWith("com.hemix.ai://auth/callback")) return;
+          try {
+            const { Browser } = await import("@capacitor/browser");
+            await Browser.close();
+          } catch {}
+          const { handleNativeOAuthCallback } = await import("@/lib/google-auth");
+          const ok = await handleNativeOAuthCallback(url);
+          if (ok) {
+            window.location.href = "/dashboard/chat";
+          }
+        });
+
         // === SAFE AREA ===
         // Add safe area class to body for CSS
         document.body.classList.add("native-app");

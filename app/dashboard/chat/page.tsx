@@ -132,6 +132,8 @@ function ChatPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setAttachments((prev) => [...prev, ...files]);
+    // Reset the input so the same file can be re-selected later
+    e.target.value = "";
   };
 
   // === SHARE MESSAGE ===
@@ -634,7 +636,7 @@ function ChatPage() {
               <div className="absolute left-2.5 sm:left-3 bottom-2.5 sm:bottom-3 flex items-center gap-1">
                 <label className="cursor-pointer touch-target no-select p-1 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center" aria-label="Attach files"
                   style={{ color: "var(--fg-muted)" }}>
-                  <input type="file" multiple className="hidden" onChange={handleFileSelect} />
+                  <input type="file" multiple className="hidden" accept="image/*,application/pdf,text/*,.txt,.md,.json,.csv,.js,.ts,.tsx,.jsx,.py,.html,.css,.xml,.yaml,.yml" onChange={handleFileSelect} />
                   <Plus className="w-5 h-5" />
                 </label>
               </div>

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Sparkles,
   Mail,
   Lock,
   ArrowRight,
@@ -13,24 +12,31 @@ import {
   AlertCircle,
   KeyRound,
   ShieldCheck,
+  Phone,
 } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { OtpInput } from "@/components/auth/OtpInput";
+import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { useAuth } from "@/lib/auth-context";
 import { showError, showSuccess } from "@/components/ui/Toast";
 
+type LoginMode = "password" | "email-otp" | "phone";
+
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginWithOTP, verifyLoginOTP } = useAuth();
+  const { login, loginWithOTP, verifyLoginOTP, loginWithPhoneOTP, verifyPhoneOTP } = useAuth();
 
-  const [mode, setMode] = useState<"password" | "otp">("password");
+  const [mode, setMode] = useState<LoginMode>("password");
   const [otpStep, setOtpStep] = useState<1 | 2>(1);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [otp, setOtp] = useState("");
+
+  // Phone state
+  const [phone, setPhone] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -41,7 +47,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (mode === "otp" && otpStep === 2 && resendTimer > 0) {
+    if (otpStep === 2 && resendTimer > 0) {
       timer = setInterval(() => {
         setResendTimer((prev) => {
           if (prev <= 1) {
@@ -55,7 +61,13 @@ export default function LoginPage() {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [mode, otpStep, resendTimer]);
+  }, [otpStep, resendTimer]);
+
+  // Reset OTP step when switching modes
+  useEffect(() => {
+    setOtpStep(1);
+    setOtp("");
+  }, [mode]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,6 +144,65 @@ export default function LoginPage() {
     }
   };
 
+  // === Phone OTP handlers ===
+  const handleSendPhoneOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setErrorMsg(null);
+
+    if (!phone.trim()) {
+      setErrorMsg("Please enter your phone number.");
+      return;
+    }
+
+    // Normalize: ensure it starts with +
+    const normalizedPhone = phone.trim().startsWith("+") ? phone.trim() : `+${phone.trim()}`;
+
+    setLoading(true);
+    try {
+      await loginWithPhoneOTP(normalizedPhone);
+      showSuccess("Verification code sent to your phone!");
+      setOtpStep(2);
+      setResendTimer(60);
+      setCanResend(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to send code";
+      setErrorMsg(msg);
+      showError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyPhoneOtp = async (codeToVerify?: string) => {
+    const code = codeToVerify || otp;
+    if (code.length !== 6) {
+      setErrorMsg("Please enter a valid 6-digit verification code.");
+      return;
+    }
+
+    const normalizedPhone = phone.trim().startsWith("+") ? phone.trim() : `+${phone.trim()}`;
+
+    setErrorMsg(null);
+    setLoading(true);
+
+    try {
+      const user = await verifyPhoneOTP(normalizedPhone, code);
+      showSuccess(`Welcome back, ${user.name || "friend"}!`);
+      router.push("/dashboard/chat");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Verification failed";
+      setErrorMsg(msg);
+      showError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify = mode === "phone" ? handleVerifyPhoneOtp : handleVerifyLoginOtp;
+  const handleSendOtp = mode === "phone" ? handleSendPhoneOtp : handleSendLoginOtp;
+  const targetLabel = mode === "phone" ? phone : email;
+  const targetLabelType = mode === "phone" ? "phone number" : "email";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -152,8 +223,20 @@ export default function LoginPage() {
           <p className="text-sm text-muted">Sign in to your account to continue</p>
         </div>
 
+        {/* Google Sign-In */}
+        <div className="mb-5">
+          <GoogleAuthButton label="Continue with Google" />
+        </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="flex-1 h-px bg-white/10" />
+          <span className="text-xs text-muted font-medium">or sign in with</span>
+          <div className="flex-1 h-px bg-white/10" />
+        </div>
+
         {/* Mode Switcher Tabs */}
-        <div className="flex p-1 rounded-xl bg-white/5 border border-white/10 mb-6">
+        <div className="flex p-1 rounded-xl bg-white/5 border border-white/10 mb-6 gap-1">
           <button
             type="button"
             onClick={() => {
@@ -172,18 +255,32 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => {
-              setMode("otp");
-              setOtpStep(1);
+              setMode("email-otp");
               setErrorMsg(null);
             }}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              mode === "otp"
+              mode === "email-otp"
                 ? "bg-primary text-white shadow-md"
                 : "text-muted hover:text-white"
             }`}
           >
-            <KeyRound className="w-3.5 h-3.5" />
+            <Mail className="w-3.5 h-3.5" />
             Email OTP
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("phone");
+              setErrorMsg(null);
+            }}
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              mode === "phone"
+                ? "bg-primary text-white shadow-md"
+                : "text-muted hover:text-white"
+            }`}
+          >
+            <Phone className="w-3.5 h-3.5" />
+            Phone
           </button>
         </div>
 
@@ -266,28 +363,45 @@ export default function LoginPage() {
             </motion.form>
           ) : otpStep === 1 ? (
             <motion.form
-              key="otp-step1"
+              key={`${mode}-step1`}
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.2 }}
-              onSubmit={handleSendLoginOtp}
+              onSubmit={handleSendOtp}
               className="space-y-4"
             >
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted z-10" />
-                <Input
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    if (errorMsg) setErrorMsg(null);
-                  }}
-                  className="pl-11"
-                  required
-                />
-              </div>
+              {mode === "phone" ? (
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted z-10" />
+                  <Input
+                    type="tel"
+                    placeholder="+92 300 1234567"
+                    value={phone}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (errorMsg) setErrorMsg(null);
+                    }}
+                    className="pl-11"
+                    required
+                  />
+                </div>
+              ) : (
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted z-10" />
+                  <Input
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (errorMsg) setErrorMsg(null);
+                    }}
+                    className="pl-11"
+                    required
+                  />
+                </div>
+              )}
 
               <Button type="submit" className="w-full" size="lg" loading={loading}>
                 Send One-Time Code
@@ -296,7 +410,7 @@ export default function LoginPage() {
             </motion.form>
           ) : (
             <motion.div
-              key="otp-step2"
+              key={`${mode}-step2`}
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
@@ -311,7 +425,7 @@ export default function LoginPage() {
 
               <div>
                 <label className="block text-xs font-medium text-muted mb-2 text-center">
-                  Enter 6-digit code sent to <span className="text-white">{email}</span>
+                  Enter 6-digit code sent to <span className="text-white">{targetLabel}</span>
                 </label>
                 <OtpInput
                   value={otp}
@@ -319,7 +433,7 @@ export default function LoginPage() {
                     setOtp(val);
                     if (errorMsg) setErrorMsg(null);
                   }}
-                  onComplete={(val) => handleVerifyLoginOtp(val)}
+                  onComplete={(val) => handleVerify(val)}
                   disabled={loading}
                   hasError={!!errorMsg}
                 />
@@ -327,7 +441,7 @@ export default function LoginPage() {
 
               <Button
                 type="button"
-                onClick={() => handleVerifyLoginOtp()}
+                onClick={() => handleVerify()}
                 className="w-full"
                 size="lg"
                 loading={loading}
@@ -348,13 +462,13 @@ export default function LoginPage() {
                   className="text-muted hover:text-white flex items-center gap-1 transition-colors"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
-                  Change email
+                  Change {targetLabelType}
                 </button>
 
                 {canResend ? (
                   <button
                     type="button"
-                    onClick={() => handleSendLoginOtp()}
+                    onClick={() => handleSendOtp()}
                     disabled={loading}
                     className="text-secondary hover:text-cyan-300 font-medium flex items-center gap-1 transition-colors"
                   >

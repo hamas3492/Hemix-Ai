@@ -51,9 +51,13 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Mobile header */}
-        <header className="lg:hidden flex items-center gap-3 h-12 px-4 glass border-b shrink-0 z-30"
-          style={{ borderColor: "var(--glass-border)" }}>
+        {/* Mobile header — padded for the status bar / notch so content never overlaps it */}
+        <header className="lg:hidden flex items-center gap-3 px-4 glass border-b shrink-0 z-30"
+          style={{
+            borderColor: "var(--glass-border)",
+            paddingTop: "calc(0.625rem + env(safe-area-inset-top, 0px))",
+            paddingBottom: "0.625rem",
+          }}>
           <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-lg hover:bg-white/5 transition-colors touch-target"
             aria-label="Open menu">
             <Menu className="w-5 h-5" style={{ color: 'var(--fg)' }} />

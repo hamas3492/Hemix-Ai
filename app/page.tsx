@@ -1,4 +1,5 @@
 import { Providers } from "@/components/Providers";
+import { NativeAppGate } from "@/components/NativeAppGate";
 import { AuroraBackground } from "@/components/landing/AuroraBackground";
 import { Navbar } from "@/components/landing/Navbar";
 import { Hero } from "@/components/landing/Hero";
@@ -10,15 +11,17 @@ import { Footer } from "@/components/landing/Footer";
 export default function HomePage() {
   return (
     <Providers>
-      <AuroraBackground />
-      <Navbar />
-      <main>
-        <Hero />
-        <FeatureCards />
-        <AICapabilities />
-        <FAQ />
-      </main>
-      <Footer />
+      <NativeAppGate>
+        <AuroraBackground />
+        <Navbar />
+        <main>
+          <Hero />
+          <FeatureCards />
+          <AICapabilities />
+          <FAQ />
+        </main>
+        <Footer />
+      </NativeAppGate>
     </Providers>
   );
 }

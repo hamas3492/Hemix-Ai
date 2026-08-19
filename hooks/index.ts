@@ -76,37 +76,71 @@ export function useKeyboardShortcut(
   }, deps);
 }
 
+/**
+ * Auto-scroll hook that keeps a container pinned to the bottom as new content
+ * arrives (e.g. chat messages, streaming text). If the user scrolls up
+ * manually, auto-scroll pauses until they scroll back near the bottom.
+ *
+ * Unlike the previous version, this uses a MutationObserver on the container
+ * to detect content changes (including streaming text that grows the
+ * scrollHeight) and scrolls immediately — not just on React re-renders.
+ */
 export function useAutoScroll<T extends HTMLElement>(deps: unknown[]): React.RefObject<T> {
   const ref = useRef<T>(null);
   const userScrolledUp = useRef(false);
 
-  // Track if user manually scrolled up
+  // Track if user manually scrolled away from the bottom
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const handleScroll = () => {
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
       userScrolledUp.current = !atBottom;
     };
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => el.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // MutationObserver: catches DOM mutations (new messages, streaming text
+  // growing, images loading) and scrolls to bottom if the user hasn't
+  // scrolled away. This is the key fix — it works even when React batches
+  // updates and the deps array doesn't trigger between renders.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const scrollToBottom = () => {
+      if (userScrolledUp.current) return;
+      el.scrollTop = el.scrollHeight;
+    };
+
+    const observer = new MutationObserver(() => {
+      scrollToBottom();
+    });
+
+    observer.observe(el, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Also scroll on deps change (covers cases where MutationObserver doesn't
+  // fire — e.g. conversation switch where content is swapped, not mutated)
   useEffect(() => {
     const el = ref.current;
     if (!el || userScrolledUp.current) return;
 
-    // Use double rAF to ensure DOM has fully painted with new content
-    // before scrolling. This fixes auto-scroll during streaming.
     const raf = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!ref.current || userScrolledUp.current) return;
-        ref.current.scrollTo({ top: ref.current.scrollHeight, behavior: "auto" });
-      });
+      if (!ref.current || userScrolledUp.current) return;
+      ref.current.scrollTop = ref.current.scrollHeight;
     });
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
+
   return ref;
 }
 

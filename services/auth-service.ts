@@ -185,6 +185,83 @@ export const authService = {
   },
 
   /**
+   * Passwordless login via SMS OTP to an existing account.
+   * Fails if no account exists for this phone number (shouldCreateUser: false).
+   */
+  async loginWithPhoneOTP(phone: string): Promise<void> {
+    const { error } = await supabase.auth.signInWithOtp({
+      phone,
+      options: {
+        shouldCreateUser: false,
+      },
+    });
+
+    if (error) {
+      throw new Error(translateAuthError(error));
+    }
+  },
+
+  /**
+   * Sends an SMS OTP for phone signup — creates the account if it doesn't exist.
+   */
+  async signupWithPhoneOTP(phone: string): Promise<void> {
+    const { error } = await supabase.auth.signInWithOtp({
+      phone,
+      options: {
+        shouldCreateUser: true,
+      },
+    });
+
+    if (error) {
+      throw new Error(translateAuthError(error));
+    }
+  },
+
+  /**
+   * Verify an SMS OTP code (works for both phone login and phone signup —
+   * Supabase treats them the same way once the code is sent).
+   */
+  async verifyPhoneOTP(phone: string, token: string): Promise<User> {
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone,
+      token,
+      type: "sms",
+    });
+
+    if (error) {
+      throw new Error(translateAuthError(error));
+    }
+
+    if (!data.user) {
+      throw new Error("Verification failed. Please try again.");
+    }
+
+    return mapSupabaseUser(data.user);
+  },
+
+  /**
+   * Kick off Google OAuth sign-in. On web this redirects the full page and
+   * returns nothing useful (browser navigates away). On native, pass
+   * skipRedirect=true to get back the auth URL to open in an in-app browser
+   * instead — the native shell handles the deep-link callback separately.
+   */
+  async signInWithGoogle(redirectTo: string, skipRedirect = false): Promise<string | null> {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        skipBrowserRedirect: skipRedirect,
+      },
+    });
+
+    if (error) {
+      throw new Error(translateAuthError(error));
+    }
+
+    return data?.url || null;
+  },
+
+  /**
    * Request password reset email.
    */
   async resetPassword(email: string): Promise<void> {
