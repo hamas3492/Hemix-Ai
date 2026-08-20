@@ -9,6 +9,15 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"],
   },
+  async redirects() {
+    return [
+      {
+        source: "/auth",
+        destination: "/auth/login",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
