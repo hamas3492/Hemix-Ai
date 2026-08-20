@@ -1,27 +1,5 @@
-import { Providers } from "@/components/Providers";
-import { NativeAppGate } from "@/components/NativeAppGate";
-import { AuroraBackground } from "@/components/landing/AuroraBackground";
-import { Navbar } from "@/components/landing/Navbar";
-import { Hero } from "@/components/landing/Hero";
-import { FeatureCards } from "@/components/landing/FeatureCards";
-import { AICapabilities } from "@/components/landing/AICapabilities";
-import { FAQ } from "@/components/landing/FAQ";
-import { Footer } from "@/components/landing/Footer";
+import { redirect } from "next/navigation";
 
-export default function HomePage() {
-  return (
-    <Providers>
-      <NativeAppGate>
-        <AuroraBackground />
-        <Navbar />
-        <main>
-          <Hero />
-          <FeatureCards />
-          <AICapabilities />
-          <FAQ />
-        </main>
-        <Footer />
-      </NativeAppGate>
-    </Providers>
-  );
+export default function RootPage() {
+  redirect("/auth/login");
 }
