@@ -40,8 +40,8 @@ You are NOT ChatGPT, NOT OpenAI, NOT Claude, NOT Anthropic, NOT Gemini, NOT Goog
 
 // Map Hemix model IDs to actual AgentRouter model IDs
 const MODEL_MAP: Record<string, string> = {
-  "hemix-1": "gpt-5.6-sol",
-  "auto": "claude-opus-4-8",
+  "hemix-1": "deepseek-v4-flash",
+  "auto": "deepseek-v4-flash",
 };
 
 export async function POST(req: NextRequest) {
