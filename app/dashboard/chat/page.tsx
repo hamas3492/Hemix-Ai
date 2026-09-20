@@ -16,6 +16,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { showSuccess } from "@/components/ui/Toast";
 import { useAutoScroll, useVoiceInput } from "@/hooks";
 import { copyToClipboard } from "@/lib/utils";
+import { ModelSelector } from "@/components/dashboard/ModelSelector";
 
 // Lazy load heavy components
 import dynamic from "next/dynamic";
@@ -108,7 +109,7 @@ function ChatPage() {
   const conversationId = searchParams.get("c");
 
   const {
-    conversations, activeConversationId, createConversation,
+    conversations, activeConversationId, createConversation, updateConversationModel,
     addMessage, updateMessage, deleteMessage,
     isGenerating, setGenerating, chatSettings,
     voiceModeOpen: voiceMode, setVoiceModeOpen: setVoiceMode,
@@ -128,6 +129,16 @@ function ChatPage() {
   const messagesEndRef = useAutoScroll<HTMLDivElement>([conversations]);
 
   const activeConv = conversations.find((c) => c.id === (conversationId || activeConversationId));
+
+  // Model selector: pending model for new chats, per-conversation model for existing chats
+  const [pendingModel, setPendingModel] = useState("hemix-1");
+  const pendingModelRef = useRef("hemix-1");
+  const currentModel = activeConv?.model || pendingModel;
+  const handleModelChange = useCallback((modelId: string) => {
+    setPendingModel(modelId);
+    pendingModelRef.current = modelId;
+    if (activeConv) updateConversationModel(activeConv.id, modelId);
+  }, [activeConv, updateConversationModel]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -289,7 +300,7 @@ function ChatPage() {
     sendingRef.current = true;
 
     let convId = activeConversationId;
-    if (!activeConv) convId = createConversation("hemix-1");
+    if (!activeConv) convId = createConversation(pendingModelRef.current);
 
     let fileContents: string[] = [];
     const attachmentData: Array<{ id: string; name: string; type: string; size: number; url?: string }> = [];
@@ -481,7 +492,7 @@ function ChatPage() {
   const handleVoiceUserMessage = useCallback((text: string) => {
     // This is called from voice mode — we add the message to chat
     let convId = activeConversationId;
-    if (!activeConv) convId = createConversation("hemix-1");
+    if (!activeConv) convId = createConversation(pendingModelRef.current);
     const userMsg: Message = {
       id: nanoid(), role: "user", content: text,
       createdAt: new Date().toISOString(), voiceTranscript: true,
@@ -491,7 +502,7 @@ function ChatPage() {
 
   const handleVoiceAIResponse = useCallback((text: string) => {
     let convId = activeConversationId;
-    if (!activeConv) convId = createConversation("hemix-1");
+    if (!activeConv) convId = createConversation(pendingModelRef.current);
     const aiMsg: Message = {
       id: nanoid(), role: "assistant", content: text,
       createdAt: new Date().toISOString(), status: "complete", voiceTranscript: true,
@@ -509,8 +520,11 @@ function ChatPage() {
             </div>
             <h2 className="text-2xl font-bold text-white mb-2">Welcome to Hemix AI</h2>
             <p className="text-muted mb-6 text-sm sm:text-base">Chat, generate images, or talk — all in one place.</p>
+            <div className="flex justify-center mb-4">
+              <ModelSelector value={currentModel} onChange={handleModelChange} />
+            </div>
             <Button variant="primary" size="lg"
-              onClick={() => createConversation("hemix-1")}
+              onClick={() => createConversation(pendingModelRef.current)}
               className="bg-gradient-to-r from-primary to-secondary font-semibold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-[1.02]">
               <img src="/assets/icon.png" alt="Hemix AI" className="w-4 h-4 rounded-full object-cover" />
               Start New Chat
@@ -523,7 +537,7 @@ function ChatPage() {
                 { title: "Ask anything", desc: "What is quantum computing?" },
               ].map((s, i) => (
                 <button key={i}
-                  onClick={() => { createConversation("hemix-1"); setTimeout(() => setInput(s.desc), 200); }}
+                  onClick={() => { createConversation(pendingModelRef.current); setTimeout(() => setInput(s.desc), 200); }}
                   className="glass-card p-3 sm:p-4 text-left hover:scale-[1.02] transition-transform touch-target">
                   <p className="text-sm font-medium text-white mb-0.5">{s.title}</p>
                   <p className="text-xs text-muted">{s.desc}</p>
@@ -549,6 +563,7 @@ function ChatPage() {
           </div>
           <h1 className="text-sm font-medium truncate" style={{ color: "var(--fg)" }}>{activeConv.title}</h1>
         </div>
+        <ModelSelector value={currentModel} onChange={handleModelChange} />
       </div>
 
       {/* === MESSAGES === */}
